@@ -1,6 +1,6 @@
 package gov.wicourts.formlet
 
-import net.liftweb.http.S
+import net.liftweb.http.{S, FileParamHolder}
 import net.liftweb.util._
 import net.liftweb.util.Helpers.{^ => _, _}
 
@@ -12,7 +12,12 @@ import Scalaz._
 import scala.language.implicitConversions
 
 object Forms {
-  type Env = String => List[String]
+  val cssSelZero = "nothing" #> PassThru
+
+  trait Env {
+    def param(name: String): List[String]
+    def file(name: String): Option[FileParamHolder]
+  }
 
   type ValidationNelE[A] = ValidationNel[FieldError,A]
   type ValidationNelS[A] = ValidationNel[String,A]
@@ -28,7 +33,7 @@ object Forms {
 
   case class FieldValue[A](name: Option[String], value: A)
 
-  case class FormState private [formlet] (values: Map[String,Any], lastId: Int) {
+  case class FormState (private [formlet] values: Map[String,Any], lastId: Int) {
     def incLastId(): FormState = copy(lastId = lastId+1)
   }
 
@@ -56,7 +61,7 @@ object Forms {
       Form(env =>
         for {
           v <- gets[FormState, Option[BoundForm[A]]](__var.get)
-          w <- v.map(b => state[FormState,BoundForm[A]](b)).getOrElse(for {
+          w <- v.map(state[FormState,BoundForm[A]]).getOrElse(for {
               aa <- this.runForm(env)
               _ <- modify[FormState](s => __var.set(s, aa))
             } yield aa)
@@ -171,7 +176,7 @@ object Forms {
       override def point[A](a: => A) =
         Form(env =>
           for (_ <- get[FormState])
-          yield BoundForm(a.success, None, ".reiwejklasjkfdssfdasfkjl" #> NodeSeq.Empty))
+          yield BoundForm(a.success, None, cssSelZero))
 
       override def ap[A,B](fa: => Form[A])(f: => Form[A=>B]): Form[B] =
         Form(env =>
@@ -219,88 +224,27 @@ object Forms {
       formState.copy(values = formState.values + (key -> value))
   }
 
-  def paramsEnv: Env = s =>
-    S.params(s).map(_.trim).filter(_.isEmpty)
-
-  def emptyEnv: Env = _ => Nil
-
-  def single(env: Env, name: String): Option[String] = env(name).headOption
-
-}
-
-trait HtmlForms {
-  import Forms._
-  import Form._
-
-  type Serializer[A] = A => String
-  type Converter[A] = String => Validation[String,A]
-
-  val requiredMessage = "This field is required"
-
-  def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
-
-  def field[A](selector: String, contents: Form[A]): Form[A] =
-    Form(env =>
-      for {
-        aa <- contents.runForm(env)
-      } yield {
-        // XXX This needs to be more flexible
-        val errorsCssSel = ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
-        BoundForm(aa.result, aa.name, selector #> (aa.transform & errorsCssSel))
-      }
-    )
-
-  def input[A](name: String, default: => Option[A])(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
-    fresult { env =>
-      val userInput = single(env, name)
-      val formValue = userInput map converter getOrElse default.success
-      BoundForm(liftStringV(formValue), None, "input [value]" #> (userInput | serializer(default)))
-    }
+  def paramsEnv: Env = new Env {
+    def param(s: String) = S.params(s).map(_.trim).filter(_.isEmpty)
+    def file(s: String) = S.request.flatMap(_.uploadedFiles.find(_.name == s))
   }
 
-  def label(label: String): Form[Unit] = sel("label *" #> label, Some(label))
-
-  private def htmlId(s: FormState) = "f" + s.lastId
-
-  object DefaultFieldHelpers {
-    // implicit val stringSerializer: Serializer[String] = _.toString
-    implicit val stringConverter: Converter[String] = s => s.success
-
-    implicit def optionSerializer[A](implicit s: Serializer[A]): Serializer[Option[A]] =
-      _.map(s(_)).getOrElse("")
-
-    implicit def optionConverter[A](implicit c: Converter[A]): Converter[Option[A]] =
-      c(_).map(Some(_))
+  def emptyEnv: Env = new Env {
+    def param(s: String) = Nil
+    def file(s: String) = None
   }
 
-}
-
-trait LowPriorityHtmlFormsFunctions extends HtmlForms {
-  H =>
-
-  import Forms._
-  import Form._
-
-  class FormOps[A](form: Form[A]) {}
-
-  implicit def formToFormOps[A](form: Form[A]): FormOps[A] =
-    new FormOps(form)
-}
-
-trait HtmlFormsFunctions extends LowPriorityHtmlFormsFunctions {
-  H =>
-
-  import Forms._
-  import Form._
-
-  class OptFormOps[A](form: Form[Option[A]]) {
-    def required: Form[A] = form.mapStringV(H.required _)
+  def singleEnv(m: Map[String, String]): Env = new Env {
+    def param(s: String) = m.get(s).toList
+    def file(s: String) = None
   }
 
-  implicit def optFormToOptFormOps[A](form: Form[Option[A]]): OptFormOps[A] =
-    new OptFormOps(form)
-}
+  def multiEnv(m: Map[String, List[String]]): Env = new Env {
+    def param(s: String) = m.getOrElse(s, Nil)
+    def file(s: String) = None
+  }
 
-object HtmlForms extends HtmlForms with HtmlFormsFunctions
+  def single(env: Env, name: String): Option[String] = env.param(name).headOption
+
+}
 
