@@ -1,6 +1,7 @@
 package gov.wicourts.formlet
 
 import org.specs2.mutable.Specification
+import org.specs2.matcher.XmlMatchers
 
 import xml._
 
@@ -10,7 +11,7 @@ import Scalaz._
 import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.SHtml.SelectableOption
 
-class HtmlFormsSpec extends Specification {
+class HtmlFormsSpec extends Specification with XmlMatchers {
   import Forms._
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
@@ -54,6 +55,16 @@ class HtmlFormsSpec extends Specification {
     "should be named by its label" >> {
       val (_, r) = field(".test", label("test label")).runEmpty
       r.name must_== Some("test label")
+    }
+
+    "should set error label to its label" >> {
+      val errorMessage = "something went wrong"
+      val l = "test label"
+      val (_, r) = field(
+        ".test",
+        Form.failing(errorMessage) <++ label(l)).runEmpty
+
+      r.result must_== FormError(Text(errorMessage), l.some).failure.toValidationNel
     }
 
     "should bind its errors" >> {
@@ -103,6 +114,23 @@ class HtmlFormsSpec extends Specification {
       val ns = applyNs(sel, <select></select>)
 
       (ns \\ "option").length must_== 3
+    }
+  }
+
+  "A checkbox form" >> {
+    "should be able render itself" >> {
+      val c = checkbox("test", true)
+
+      val expected =
+        <div>
+          <input type="checkbox" name="test" value="true"/>
+          <input type="hidden" name="test" value="false"/>
+        </div>
+
+
+      val ns = applyNs(c, <div><input></input></div>)
+
+      ns must ==/ (expected)
     }
   }
 
@@ -185,7 +213,7 @@ class HtmlFormsSpec extends Specification {
         ".lastName",
         input[String]("lastName", None) <++ label("Last name"))
 
-      def requireIfOtherSet[B,A](bn: FieldValue[Option[B]], a: Option[A]): Validation[String,Option[A]] =
+      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): Validation[String,Option[A]] =
         if (bn.value.isDefined && a.isEmpty)
           ("This field is required if the " + bn.name.getOrElse("N/A") + " field is set").failure
         else

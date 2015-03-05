@@ -8,6 +8,8 @@ scalaVersion := "2.11.4"
 
 resolvers += "Sonatype Snapshots Repository" at "http://oss.sonatype.org/content/repositories/snapshots"
 
+resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
+
 {
   val liftVersion = "3.0-M3"
   libraryDependencies ++= Seq(
@@ -18,7 +20,8 @@ resolvers += "Sonatype Snapshots Repository" at "http://oss.sonatype.org/content
 }
 
 libraryDependencies ++= Seq(
-  "org.specs2" %% "specs2-core" % "2.4.16" % "test"
+  "org.specs2" %% "specs2-core" % "3.0" % "test",
+  "org.specs2" %% "specs2-matcher-extra" % "3.0" % "test"
 )
 
 scalacOptions ++= Seq("-deprecation","-feature","-Xfatal-warnings")

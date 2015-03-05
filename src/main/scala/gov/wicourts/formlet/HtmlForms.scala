@@ -30,7 +30,7 @@ trait HtmlForms {
       } yield {
         // XXX This needs to be more flexible
         val errorsCssSel = ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
-        BoundForm(aa.result, aa.name, selector #> (aa.transform & errorsCssSel))
+        BoundForm(setLabel(aa.result, aa.name), aa.name, selector #> (aa.transform & errorsCssSel))
       }
     )
 
@@ -151,6 +151,28 @@ trait HtmlForms {
   ): Form[Option[A]] =
     multiSelect(name, default.toList, options)(transform).map(_.headOption)
 
+  def checkbox(
+    name: String, default: Boolean
+  )(
+    implicit serializer: Serializer[Boolean], converter: Converter[Boolean]
+  ): Form[Boolean] = {
+    fresult { env =>
+      val userInput = single(env, name)
+      val formValue = userInput map converter getOrElse default.success
+      BoundForm(
+        liftStringV(formValue),
+        None,
+        "input" #> { ns: NodeSeq => ns match {
+          case element: Elem => {
+            val checkboxNs = <input type="checkbox" name={name} value={serializer(formValue | default)} />
+
+            element.attributes.foldLeft(checkboxNs)(_ % _) ++
+            <input type="hidden" name={name} value="false" />
+          }
+        }})
+      }
+    }
+
   private def baseInput[A](
     nameSelector: String, valueSelector: String, name: String, default: Option[A]
   )(
@@ -173,6 +195,11 @@ trait HtmlForms {
   object DefaultFieldHelpers {
     // implicit val stringSerializer: Serializer[String] = _.toString
     implicit val stringConverter: Converter[String] = s => s.success
+
+    implicit val booleanSerializer: Serializer[Boolean] = _.toString
+
+    implicit val booleanConverter: Converter[Boolean] = s =>
+      (s.equals("1") || s.equalsIgnoreCase("on") || s.equalsIgnoreCase("true")).success
 
     implicit def optionSerializer[A](implicit s: Serializer[A]): Serializer[Option[A]] =
       _.map(s(_)).getOrElse("")

@@ -19,19 +19,12 @@ object Forms {
     def file(name: String): Option[FileParamHolder]
   }
 
-  type ValidationNelE[A] = ValidationNel[FieldError,A]
+  type ValidationNelE[A] = ValidationNel[FormError,A]
   type ValidationNelS[A] = ValidationNel[String,A]
 
-  trait FieldError {
-    def render: NodeSeq
-  }
+  case class FormError(render: NodeSeq, label: Option[String] = None)
 
-  case class FieldErrorN(render: NodeSeq) extends FieldError
-  case class FieldErrorS(s: String) extends FieldError {
-    def render = Text(s)
-  }
-
-  case class FieldValue[A](name: Option[String], value: A)
+  case class FormValue[A](name: Option[String], value: A)
 
   case class FormState (private [formlet] values: Map[String,Any], lastId: Int) {
     def incLastId(): FormState = copy(lastId = lastId+1)
@@ -95,7 +88,7 @@ object Forms {
     private def foldValResult(a: ValidationNelE[ValidationNelS[A]]): ValidationNelE[A] =
       a.fold(_.failure[A], Form.liftNelStringV(_))
 
-    def val2[B](b: Form[B])(fs: ((FieldValue[B], A) => Validation[String,A])*): Form[A] =
+    def val2[B](b: Form[B])(fs: ((FormValue[B], A) => Validation[String,A])*): Form[A] =
       Form(env =>
         for {
           bb <- b.runForm(env)
@@ -104,14 +97,14 @@ object Forms {
           val result =
             foldValResult(
               ^(bb.result, aa.result)((b, a) =>
-                traverseVals(a, fs.toList.map(_.curried(FieldValue(bb.name, b))))))
+                traverseVals(a, fs.toList.map(_.curried(FormValue(bb.name, b))))))
           BoundForm(result, aa.name, aa.transform)
         })
 
     def val3[B,C](
       b: Form[B], c: Form[C]
     )(
-      fs: ((FieldValue[B], FieldValue[C], A
+      fs: ((FormValue[B], FormValue[C], A
     ) => Validation[String,A])*): Form[A] =
       Form(env =>
         for {
@@ -123,14 +116,14 @@ object Forms {
             foldValResult(
               ^^(bb.result, cc.result, aa.result)((b, c, a) =>
                 traverseVals(a, fs.toList.map(f =>
-                  f(FieldValue(bb.name, b), FieldValue(cc.name, c), _: A)))))
+                  f(FormValue(bb.name, b), FormValue(cc.name, c), _: A)))))
           BoundForm(result, aa.name, aa.transform)
         })
 
     def val4[B,C,D](
       b: Form[B], c: Form[C], d: Form[D]
     )(
-      fs: ((FieldValue[B], FieldValue[C], FieldValue[D], A) => Validation[String,A])*
+      fs: ((FormValue[B], FormValue[C], FormValue[D], A) => Validation[String,A])*
     ): Form[A] =
       Form(env =>
         for {
@@ -143,7 +136,7 @@ object Forms {
             foldValResult(
               ^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
                 traverseVals(a, fs.toList.map(f =>
-                  f(FieldValue(bb.name, b), FieldValue(cc.name, c), FieldValue(dd.name, d), _: A)))))
+                  f(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), _: A)))))
           BoundForm(result, aa.name, aa.transform)
         })
 
@@ -208,10 +201,13 @@ object Forms {
       Form(env => for (_ <- get[FormState]) yield f(env))
 
     def liftStringV[A](in: Validation[String,A]): ValidationNelE[A] =
-      in.leftMap(FieldErrorS(_)).toValidationNel
+      in.leftMap(s => FormError(Text(s))).toValidationNel
 
     def liftNelStringV[A](in: ValidationNelS[A]): ValidationNelE[A] =
-      in.leftMap(_.map(FieldErrorS(_)))
+      in.leftMap(_.map(s => FormError(Text(s))))
+
+    def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
+      in.leftMap(_.map(_.copy(label = label)))
   }
 
   class FormStateVar[T] {
