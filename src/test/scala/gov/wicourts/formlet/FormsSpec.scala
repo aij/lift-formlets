@@ -11,6 +11,7 @@ import net.liftweb.util.Helpers.{^ => _, _}
 
 class FormsSpec extends Specification {
   import Forms._
+  import Forms.FormsHelpers._
 
   val F = Form.F
 
@@ -34,12 +35,12 @@ class FormsSpec extends Specification {
   "A validated form" >> {
     "should process all its validations" >> {
       val (_, r) =
-        (F.point(Some("hi")) ?? (_ => "nope".failure, _ => "definitely not".failure)).runEmpty
+        (F.point("hi".some) ?? (_ => "nope".failure, _ => "definitely not".failure)).runEmpty
       r.errors must_== List(Text("nope"), Text("definitely not"))
     }
     "should process validations in groups" >> {
       val (_, r) =
-        (F.point(Some("hi")) ?? (_ => "nope".failure) ?? (_ => "definitely not".failure)).runEmpty
+        (F.point("hi".some) ?? (_ => "nope".failure) ?? (_ => "definitely not".failure)).runEmpty
       r.errors must_== List(Text("nope"))
     }
   }
@@ -51,6 +52,7 @@ class FormsSpec extends Specification {
           _ <- get[FormState]
         } yield BoundForm(
           randomString(10).success,
+          None,
           None,
           Forms.cssSelZero))
 

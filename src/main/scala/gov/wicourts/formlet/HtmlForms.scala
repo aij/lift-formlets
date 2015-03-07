@@ -23,6 +23,11 @@ trait HtmlForms {
 
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
 
+  def html5Required[A](a: Option[A]): ValidationNelE[A] =
+    required(a)
+      .leftMap(s => FormError(Text(s), None, Some(s => (s + " [required]") #> "required")))
+      .toValidationNel
+
   def field[A](selector: String, contents: Form[A]): Form[A] =
     Form(env =>
       for {
@@ -30,29 +35,33 @@ trait HtmlForms {
       } yield {
         // XXX This needs to be more flexible
         val errorsCssSel = ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
-        BoundForm(setLabel(aa.result, aa.name), aa.name, selector #> (aa.transform & errorsCssSel))
+        BoundForm(
+          setLabel(aa.result, aa.name),
+          aa.name,
+          aa.baseSelector,
+          selector #> (aa.transform & errorsCssSel))
       }
     )
 
   def input[A](name: String, default: Option[A])(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
-    baseInput("input [name]", "input [value]", name, default)
+    baseInput("input", "input [name]", "input [value]", name, default)
   }
 
   def textarea[A](name: String, default: Option[A])(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
-    baseInput("textarea [name]", "textarea *", name, default)
+    baseInput("textarea", "textarea [name]", "textarea *", name, default)
   }
 
   case class SelectableOptionWithNonce[+T](nonce: String, option: SelectableOption[T])
 
-  type SelectTransformer[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => CssSel
+  type SelectTransformer[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
   def asSelect[A](
     multiple: Boolean
   )(
     name: String, selectedNonces: List[String], options: List[SelectableOptionWithNonce[A]]
-  ): CssSel = {
+  ): (String, CssSel) = {
      def selected(in: Boolean) = {
        if (in)
          new UnprefixedAttribute("selected", "selected", Null)
@@ -76,7 +85,7 @@ trait HtmlForms {
           selected(selectedNonces.contains(nonce))
       }
 
-    multipleSel & nameSel & "select *" #> <xml:group>{optionsNs}</xml:group>
+    ("select", multipleSel & nameSel & "select *" #> <xml:group>{optionsNs}</xml:group>)
   }
 
   def selectMultiSelect[A](
@@ -130,7 +139,9 @@ trait HtmlForms {
           if (values.nonEmpty) values.map(_.nonce)
           else defaultNonces
 
-        BoundForm(liftStringV(formValue.success), None, transform(name, nonces, options))
+        val (selector, sel) = transform(name, nonces, options)
+
+        BoundForm(liftStringV(formValue.success), None, Some(selector), sel)
       }
     )
   }
@@ -162,6 +173,7 @@ trait HtmlForms {
       BoundForm(
         liftStringV(formValue),
         None,
+        Some("input"),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
             val checkboxNs = <input type="checkbox" name={name} value={serializer(formValue | default)} />
@@ -174,7 +186,11 @@ trait HtmlForms {
     }
 
   private def baseInput[A](
-    nameSelector: String, valueSelector: String, name: String, default: Option[A]
+    baseSelector: String,
+    nameSelector: String,
+    valueSelector: String,
+    name: String,
+    default: Option[A]
   )(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
   ): Form[Option[A]] = {
@@ -184,13 +200,12 @@ trait HtmlForms {
       BoundForm(
         liftStringV(formValue),
         None,
+        Some(baseSelector),
         nameSelector #> name & valueSelector #> (userInput | serializer(default)))
     }
   }
 
   def label(label: String): Form[Unit] = sel("label *" #> label, Some(label))
-
-  private def htmlId(s: FormState) = "f" + s.lastId
 
   object DefaultFieldHelpers {
     // implicit val stringSerializer: Serializer[String] = _.toString
@@ -199,7 +214,7 @@ trait HtmlForms {
     implicit val booleanSerializer: Serializer[Boolean] = _.toString
 
     implicit val booleanConverter: Converter[Boolean] = s =>
-      (s.equals("1") || s.equalsIgnoreCase("on") || s.equalsIgnoreCase("true")).success
+      asBoolean(s).openOr(false).success
 
     implicit def optionSerializer[A](implicit s: Serializer[A]): Serializer[Option[A]] =
       _.map(s(_)).getOrElse("")
@@ -224,6 +239,7 @@ trait HtmlFormsFunctions extends LowPriorityHtmlFormsFunctions {
 
   class OptFormOps[A](form: Form[Option[A]]) {
     def required: Form[A] = form.mapStringV(H.required _)
+    def html5Required: Form[A] = form.mapV(H.html5Required _)
   }
 
   implicit def optFormToOptFormOps[A](form: Form[Option[A]]): OptFormOps[A] =

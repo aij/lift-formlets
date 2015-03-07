@@ -13,6 +13,8 @@ import net.liftweb.http.SHtml.SelectableOption
 
 class HtmlFormsSpec extends Specification with XmlMatchers {
   import Forms._
+  import Forms.FormsHelpers._
+
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
 
@@ -20,6 +22,10 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
   def applyNs[A](form: Form[A], ns: NodeSeq): NodeSeq =
     form.runEmpty._2.transform.apply(ns).head
+
+  def checkResult[A](form: Form[A], ns: NodeSeq, expected: NodeSeq) = {
+    applyNs(form, ns) must ==/ (expected)
+  }
 
   def testEnv = new Env {
     def param(s: String) =
@@ -62,7 +68,7 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
       val l = "test label"
       val (_, r) = field(
         ".test",
-        Form.failing(errorMessage) <++ label(l)).runEmpty
+        Form.failing(errorMessage) <* label(l)).runEmpty
 
       r.result must_== FormError(Text(errorMessage), l.some).failure.toValidationNel
     }
@@ -70,7 +76,13 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
     "should bind its errors" >> {
       val xml = <div class="test"><div class="errors"></div></div>
       val result = <div class="test"><div class="errors"><div>no way!</div></div></div>
-      applyNs(field(".test", Form.failing("no way!")), xml) must_== result
+      checkResult(field(".test", Form.failing("no way!")), xml, result)
+    }
+
+    "should be able to bind directly to an <input>" >> {
+      val xml = <input class="testClass"></input>
+      val result = <input name="testName" class="testClass" value="v"></input>
+      checkResult(field(".testClass", input("testName", Some("v"))), xml, result)
     }
   }
 
@@ -97,7 +109,7 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
         name: String,
         defaults: List[String],
         options: List[SelectableOptionWithNonce[A]]
-      ) = "div" #> options.map(_.nonce).mkString(",")
+      ) = ("div", "div" #> options.map(_.nonce).mkString(","))
 
       val sel = select("test", None, options)(transform _).required
 
@@ -119,18 +131,14 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
   "A checkbox form" >> {
     "should be able render itself" >> {
-      val c = checkbox("test", true)
-
+      val xml = <div><input></input></div>
       val expected =
         <div>
           <input type="checkbox" name="test" value="true"/>
           <input type="hidden" name="test" value="false"/>
         </div>
 
-
-      val ns = applyNs(c, <div><input></input></div>)
-
-      ns must ==/ (expected)
+      checkResult(checkbox("test", true), xml, expected)
     }
   }
 
@@ -153,13 +161,13 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
       val requiredFirstName = input("firstName", Some("Frank")).required
 
       def mkFirstName(input: Form[String]): Form[String] =
-        field(".firstName", input <++ label("First name"))
+        field(".firstName", input <* label("First name"))
 
       val firstName = mkFirstName(requiredFirstName)
 
       val lastName = field(
         ".lastName",
-        input("lastName", Some("Johnson")).required <++ label("Last name")
+        input("lastName", Some("Johnson")).required <* label("Last name")
       )
 
 
@@ -194,12 +202,12 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
     "using Frank example #2" >> {
       val firstName = field(
         ".firstName",
-        input[String]("firstName", None) <++ label("Last name")
+        input[String]("firstName", None) <* label("Last name")
       )
 
       val lastName = field(
         ".lastName",
-        input[String]("lastName", "Johnson".some) <++ label("Last name")
+        input[String]("lastName", "Johnson".some) <* label("Last name")
       )
 
       "can combine multiple optional fields" >> {
@@ -211,9 +219,9 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
     "using Frank example #3" >> {
       val lastName = field(
         ".lastName",
-        input[String]("lastName", None) <++ label("Last name"))
+        input[String]("lastName", None) <* label("Last name"))
 
-      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): Validation[String,Option[A]] =
+      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): Validation[FormError,Option[A]] =
         if (bn.value.isDefined && a.isEmpty)
           ("This field is required if the " + bn.name.getOrElse("N/A") + " field is set").failure
         else
@@ -221,7 +229,7 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
       val firstNameInput = input[String]("firstName", None)
         .val2(lastName)(requireIfOtherSet)
-      val firstName = field(".firstName", firstNameInput <++ label("First name"))
+      val firstName = field(".firstName", firstNameInput <* label("First name"))
 
       val fullName = optionalFullName(firstName, lastName)
 
