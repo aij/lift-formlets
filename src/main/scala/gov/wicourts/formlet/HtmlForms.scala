@@ -16,6 +16,8 @@ import gov.wicourts.formlet.Forms._
 import gov.wicourts.formlet.Forms.Form._
 
 trait HtmlForms {
+  import FormHelpers._
+
   type Serializer[A] = A => String
   type Converter[A] = String => Validation[String,A]
 
@@ -23,10 +25,10 @@ trait HtmlForms {
 
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
 
-  def html5Required[A](a: Option[A]): ValidationNelE[A] =
-    required(a)
-      .leftMap(s => FormError(Text(s), None, Some(s => (s + " [required]") #> "required")))
-      .toValidationNel
+  def html5Required[A]: FormValidation[Option[A],A] =
+    FormValidation(
+      a => liftStringV(required(a)),
+      Some(s => (s + " [required]") #> "required"))
 
   def field[A](selector: String, contents: Form[A]): Form[A] =
     Form(env =>
@@ -208,7 +210,6 @@ trait HtmlForms {
   def label(label: String): Form[Unit] = sel("label *" #> label, Some(label))
 
   object DefaultFieldHelpers {
-    // implicit val stringSerializer: Serializer[String] = _.toString
     implicit val stringConverter: Converter[String] = s => s.success
 
     implicit val booleanSerializer: Serializer[Boolean] = _.toString
@@ -239,7 +240,7 @@ trait HtmlFormsFunctions extends LowPriorityHtmlFormsFunctions {
 
   class OptFormOps[A](form: Form[Option[A]]) {
     def required: Form[A] = form.mapStringV(H.required _)
-    def html5Required: Form[A] = form.mapV(H.html5Required _)
+    def html5Required: Form[A] = form.mapV(H.html5Required)
   }
 
   implicit def optFormToOptFormOps[A](form: Form[Option[A]]): OptFormOps[A] =

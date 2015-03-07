@@ -13,7 +13,7 @@ import net.liftweb.http.SHtml.SelectableOption
 
 class HtmlFormsSpec extends Specification with XmlMatchers {
   import Forms._
-  import Forms.FormsHelpers._
+  import Forms.FormHelpers._
 
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
@@ -23,7 +23,7 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
   def applyNs[A](form: Form[A], ns: NodeSeq): NodeSeq =
     form.runEmpty._2.transform.apply(ns).head
 
-  def checkResult[A](form: Form[A], ns: NodeSeq, expected: NodeSeq) = {
+  def check[A](form: Form[A], ns: NodeSeq, expected: NodeSeq) = {
     applyNs(form, ns) must ==/ (expected)
   }
 
@@ -36,7 +36,9 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
   "A label form" >> {
     "should bind the label to the argument" >> {
-      applyNs(label("test label"), <label></label>) must_== <label>test label</label>
+      val in = <label></label>
+      val out = <label>test label</label>
+      check(label("test label"), in, out)
     }
   }
 
@@ -52,8 +54,15 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
     }
 
     "should bind its name and value" >> {
-      val v = applyNs(input("test", "a".some), <input/>)
-      v must_== <input name="test" value="a"></input>
+      val in = <input />
+      val out = <input name="test" value="a" />
+      check(input("test", "a".some), in, out)
+    }
+
+    "should support client-side validation" >> {
+      val in = <input />
+      val out = <input name="test" value="" required="required"></input>
+      check(input[String]("test", None).html5Required, in, out)
     }
   }
 
@@ -74,15 +83,15 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
     }
 
     "should bind its errors" >> {
-      val xml = <div class="test"><div class="errors"></div></div>
-      val result = <div class="test"><div class="errors"><div>no way!</div></div></div>
-      checkResult(field(".test", Form.failing("no way!")), xml, result)
+      val in = <div class="test"><div class="errors"></div></div>
+      val out = <div class="test"><div class="errors"><div>no way!</div></div></div>
+      check(field(".test", Form.failing("no way!")), in, out)
     }
 
     "should be able to bind directly to an <input>" >> {
-      val xml = <input class="testClass"></input>
-      val result = <input name="testName" class="testClass" value="v"></input>
-      checkResult(field(".testClass", input("testName", Some("v"))), xml, result)
+      val in = <input class="testClass"></input>
+      val out = <input name="testName" class="testClass" value="v"></input>
+      check(field(".testClass", input("testName", Some("v"))), in, out)
     }
   }
 
@@ -131,14 +140,14 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
   "A checkbox form" >> {
     "should be able render itself" >> {
-      val xml = <div><input></input></div>
-      val expected =
+      val in = <div><input></input></div>
+      val out =
         <div>
           <input type="checkbox" name="test" value="true"/>
           <input type="hidden" name="test" value="false"/>
         </div>
 
-      checkResult(checkbox("test", true), xml, expected)
+      check(checkbox("test", true), in, out)
     }
   }
 
@@ -190,7 +199,7 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
         // Simulate a user entry of Joe for firstName
         val env = singleEnv(Map("firstName" -> "Joe"))
         val frankFirstName = mkFirstName(requiredFirstName ?? (
-          s => if (s.startsWith("Frank")) s.success else "Only Frank is allowed".failure))
+          StringValidation(s => if (s.startsWith("Frank")) s.success else "Only Frank is allowed".failure)))
 
         val fullName = ^(frankFirstName, lastName)(FullName.apply _)
         val (_, r) = fullName.run(env)
@@ -221,14 +230,17 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
         ".lastName",
         input[String]("lastName", None) <* label("Last name"))
 
-      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): Validation[FormError,Option[A]] =
-        if (bn.value.isDefined && a.isEmpty)
-          ("This field is required if the " + bn.name.getOrElse("N/A") + " field is set").failure
-        else
-          a.success
+      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): ValidationNelE[Option[A]] = {
+        val result =
+          if (bn.value.isDefined && a.isEmpty)
+            ("This field is required if the " + bn.name.getOrElse("N/A") + " field is set").failure
+          else
+            a.success
+        liftStringV(result)
+      }
 
       val firstNameInput = input[String]("firstName", None)
-        .val2(lastName)(requireIfOtherSet)
+        .val2(lastName)(lift2V(requireIfOtherSet))
       val firstName = field(".firstName", firstNameInput <* label("First name"))
 
       val fullName = optionalFullName(firstName, lastName)

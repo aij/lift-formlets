@@ -22,10 +22,49 @@ object Forms {
   type ValidationNelE[A] = ValidationNel[FormError,A]
   type ValidationNelS[A] = ValidationNel[String,A]
 
+  def StringValidation[A](f: A => Validation[String,A]): FormValidation[A,A] =
+    FormValidation(a => FormHelpers.liftStringV(f(a)), None)
+
+  case class FormValidation[A,B](
+    validation: A => ValidationNelE[B],
+    transform: Option[String => CssSel] = None
+  ) {
+    def map[C](f: B => C): FormValidation[A,C] =
+      FormValidation(a => validation(a) map f, transform)
+
+    def ap[C](f: => FormValidation[A,B => C]): FormValidation[A,C] =
+      FormValidation(
+        a => this.validation(a) <*> f.validation(a),
+        (this.transform, f.transform) match {
+          case (Some(t1), Some(t2)) => Some((s: String) => t1(s) & t2(s))
+          case (f1@Some(_), None) => f1
+          case (None, f2@Some(_)) => f2
+          case (None, None) => None
+        }
+      )
+
+    def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
+      new FormValidation(a => this.validation(a).map(_ => f(a)), this.transform)
+  }
+
+  trait FormValidationInstances {
+    implicit def formValidationApplicative[X]: Applicative[({type f[a] = FormValidation[X, a]})#f] =
+      new Applicative[({type f[a] = FormValidation[X, a]})#f] {
+        override def map[A, B](a: FormValidation[X,A])(f: A => B): FormValidation[X,B] = a map f
+
+        override def point[A](a: => A) =
+          FormValidation[X,A](_ => a.success, None)
+
+        override def ap[A,B](fa: => FormValidation[X,A])(f: => FormValidation[X,A=>B]): FormValidation[X,B] =
+          fa ap f
+      }
+  }
+
+  object FormValidation extends FormValidationInstances
+
   case class FormError(
     render: NodeSeq,
-    label: Option[String] = None,
-    transform: Option[String => CssSel] = None
+    label: Option[String] = None
   )
 
   case class FormValue[A](name: Option[String], value: A)
@@ -81,49 +120,37 @@ object Forms {
           Form.combineBaseSelectors(aa, ff),
           aa.transform & ff.transform))
 
-    private def extractErrorTransforms[B](
-      result: ValidationNelE[B],
-      baseSelector: Option[String]
-    ): List[CssSel] = {
-      for {
-        sel <- baseSelector.toList
-        errs <- result.swap.toList
-        err <- errs.toList
-        f <- err.transform
-      } yield f(sel)
-    }
-
-    def mapV[B](f: A => ValidationNelE[B]): Form[B] =
+    def mapV[B](f: FormValidation[A,B]): Form[B] =
       Form(env =>
         for {
           aa <- this.runForm(env)
         } yield {
-          if (aa.result.isFailure)
-            aa.copy(result = aa.result map f) // Just to get the types right
-          else {
-            val m = aa.result map f
-            val errTransforms = extractErrorTransforms(m, aa.baseSelector)
-
-            BoundForm(m, aa.name, aa.baseSelector, composeTransform(aa, errTransforms))
-          }
+          BoundForm(
+            aa.result map f.validation,
+            aa.name,
+            aa.baseSelector,
+            errTransform(aa, f))
         }).liftV
 
+    private def errTransform[A,B,C](aa: BoundForm[A], f: FormValidation[B,C]): CssSel = {
+      val e =
+        for {
+          sel <- aa.baseSelector
+          t <- f.transform
+        } yield aa.transform & t(sel)
+      e getOrElse aa.transform
+    }
+
     def mapStringV[B](f: A => Validation[String,B]): Form[B] =
-      this.mapV(a => Form.liftStringV(f(a)))
+      this.mapV(FormValidation(a => FormHelpers.liftStringV(f(a)), None))
 
-    def ??(fs: (A => Validation[FormError,A])*): Form[A] =
-      this.mapV(a => traverseVals(a, fs.toList))
-
-    private def traverseVals(a: A, l: List[A => Validation[FormError,A]]): ValidationNelE[A] =
-      l.traverseU(_(a).toValidationNel).map(_ => a)
+    def ??(fs: FormValidation[A,A]*): Form[A] =
+      this.mapV(fs.toList.sequenceU.flatten(identity))
 
     private def foldValResult(a: ValidationNelE[ValidationNelE[A]]): ValidationNelE[A] =
       a.fold(_.failure[A], identity)
 
-    private def composeTransform(form: BoundForm[A], l: List[CssSel]): CssSel =
-      l.foldLeft(form.transform)((b, a) => b & a)
-
-    def val2[B](b: Form[B])(fs: ((FormValue[B], A) => Validation[FormError,A])*): Form[A] =
+    def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
       Form(env =>
         for {
           bb <- b.runForm(env)
@@ -132,20 +159,20 @@ object Forms {
           if (List(bb, aa).exists(_.result.isFailure))
             aa
           else {
+            val all = fs.toList.sequenceU.flatten(_._2)
             val result =
               foldValResult(
                 ^(bb.result, aa.result)((b, a) =>
-                  traverseVals(a, fs.toList.map(_.curried(FormValue(bb.name, b))))))
-            val errTransforms = extractErrorTransforms(result, aa.baseSelector)
-            BoundForm(result, aa.name, aa.baseSelector, composeTransform(aa, errTransforms))
+                  all.validation(FormValue(bb.name, b), a)))
+            BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
 
     def val3[B,C](
       b: Form[B], c: Form[C]
     )(
-      fs: ((FormValue[B], FormValue[C], A
-    ) => Validation[FormError,A])*): Form[A] =
+      fs: FormValidation[(FormValue[B], FormValue[C], A), A]*
+    ): Form[A] =
       Form(env =>
         for {
           bb <- b.runForm(env)
@@ -155,20 +182,19 @@ object Forms {
           if (List(bb, cc, aa).exists(_.result.isFailure))
             aa
           else {
+            val all = fs.toList.sequenceU.flatten(_._3)
             val result =
               foldValResult(
                 ^^(bb.result, cc.result, aa.result)((b, c, a) =>
-                  traverseVals(a, fs.toList.map(f =>
-                    f(FormValue(bb.name, b), FormValue(cc.name, c), _: A)))))
-            val errTransforms = extractErrorTransforms(result, aa.baseSelector)
-            BoundForm(result, aa.name, aa.baseSelector, composeTransform(aa, errTransforms))
+                    all.validation(FormValue(bb.name, b), FormValue(cc.name, c), a)))
+            BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
 
     def val4[B,C,D](
       b: Form[B], c: Form[C], d: Form[D]
     )(
-      fs: ((FormValue[B], FormValue[C], FormValue[D], A) => Validation[FormError,A])*
+      fs: FormValidation[(FormValue[B], FormValue[C], FormValue[D], A), A]*
     ): Form[A] =
       Form(env =>
         for {
@@ -180,13 +206,12 @@ object Forms {
           if (List(bb, cc, dd, aa).exists(_.result.isFailure))
             aa
           else {
+            val all = fs.toList.sequenceU.flatten(_._4)
             val result =
               foldValResult(
                 ^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
-                  traverseVals(a, fs.toList.map(f =>
-                    f(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), _: A)))))
-            val errTransforms = extractErrorTransforms(result, aa.baseSelector)
-            BoundForm(result, aa.name, aa.baseSelector, composeTransform(aa, errTransforms))
+                  all.validation(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), a)))
+            BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
 
@@ -205,7 +230,7 @@ object Forms {
         for {
           aa <- this.runForm(env)
         } yield BoundForm(
-          aa.result.fold(_.failure[C], a => Form.liftNelStringV(a)),
+          aa.result.fold(_.failure[C], a => FormHelpers.liftNelStringV(a)),
           aa.name,
           aa.baseSelector,
           aa.transform))
@@ -250,12 +275,6 @@ object Forms {
     def fresult[A](f: Env => BoundForm[A]): Form[A] =
       Form(env => for (_ <- get[FormState]) yield f(env))
 
-    def liftStringV[A](in: Validation[String,A]): ValidationNelE[A] =
-      in.leftMap(s => FormError(Text(s))).toValidationNel
-
-    def liftNelStringV[A](in: ValidationNelS[A]): ValidationNelE[A] =
-      in.leftMap(_.map(s => FormError(Text(s))))
-
     def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
       in.leftMap(_.map(_.copy(label = label)))
   }
@@ -292,15 +311,25 @@ object Forms {
 
   def single(env: Env, name: String): Option[String] = env.param(name).headOption
 
-  object FormsHelpers extends LowPriorityFormsHelpersImplicits {
-    // For the benefit of Failure
-    implicit def stringNothingToFormErrorV(in: Validation[String,Nothing]): Validation[FormError,Nothing] =
-      in.leftMap(s => FormError(Text(s)))
-  }
+  object FormHelpers {
+    def lift2V[A,B](f: (FormValue[B], A) => ValidationNelE[A]): FormValidation[(FormValue[B],A),A] =
+      FormValidation({ case (bn, a) => f(bn, a) }, None)
 
-  trait LowPriorityFormsHelpersImplicits {
-    implicit def stringToFormErrorV[A](in: Validation[String,A]): Validation[FormError,A] =
-      in.leftMap(s => FormError(Text(s)))
+    def lift3V[A,B,C](
+      f: (FormValue[B], FormValue[C], A) => ValidationNelE[A]
+    ): FormValidation[(FormValue[B],FormValue[C],A),A] =
+      FormValidation({ case (bn, cn, a) => f(bn, cn, a) }, None)
+
+    def lift4V[A,B,C,D](
+      f: (FormValue[B], FormValue[C], FormValue[D], A) => ValidationNelE[A]
+    ): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+      FormValidation({ case (bn, cn, dn, a) => f(bn, cn, dn, a) }, None)
+
+    def liftStringV[A](in: Validation[String,A]): ValidationNelE[A] =
+      in.leftMap(s => FormError(Text(s))).toValidationNel
+
+    def liftNelStringV[A](in: ValidationNelS[A]): ValidationNelE[A] =
+      in.leftMap(_.map(s => FormError(Text(s))))
   }
 }
 
