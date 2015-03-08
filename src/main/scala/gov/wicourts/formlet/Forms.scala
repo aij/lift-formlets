@@ -45,6 +45,8 @@ object Forms {
 
     def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
       new FormValidation(a => this.validation(a).map(_ => f(a)), this.transform)
+
+    def setTransform(f: String => CssSel): FormValidation[A,B] = this.copy(transform = Some(f))
   }
 
   trait FormValidationInstances {
@@ -69,10 +71,15 @@ object Forms {
 
   case class FormValue[A](name: Option[String], value: A)
 
-  case class FormState (private [formlet] values: Map[String,Any])
+  case class FormState (private [formlet] values: Map[String,Any], private [formlet] context: List[String]) {
+    def pushContext(s: String): FormState = this.copy(context = s :: context)
+    def popContext: FormState = this.copy(context = context.tail)
+
+    def contextName(name: String): String = (name :: context).reverse.mkString("_")
+  }
 
   object FormState {
-    def apply(): FormState = FormState(Map[String,Any]())
+    def apply(): FormState = FormState(Map[String,Any](), Nil)
   }
 
   case class BoundForm[A](
@@ -90,7 +97,9 @@ object Forms {
     def run(env: Env, initialState: FormState = FormState()): (FormState, BoundForm[A]) =
       runForm(env).run(initialState)
 
-    def runEmpty(): (FormState, BoundForm[A]) = run(emptyEnv)
+    def runEmpty: (FormState, BoundForm[A]) = run(emptyEnv)
+
+    def evalEmpty: BoundForm[A] = runEmpty._2
 
     def memoize: Form[A] = {
       val __var = new FormStateVar[BoundForm[A]]
@@ -102,6 +111,15 @@ object Forms {
               _ <- modify[FormState](s => __var.set(s, aa))
             } yield aa)
         } yield w)
+    }
+
+    def context(c: String): Form[A] = {
+      Form(env =>
+        for {
+          _ <- modify[FormState](_.pushContext(c))
+          aa <- this.runForm(env)
+          _ <- modify[FormState](_.popContext)
+        } yield aa)
     }
 
     def map[B](f: A => B): Form[B] =
@@ -147,7 +165,16 @@ object Forms {
     def ??(fs: FormValidation[A,A]*): Form[A] =
       this.mapV(fs.toList.sequenceU.flatten(identity))
 
-    private def foldValResult(a: ValidationNelE[ValidationNelE[A]]): ValidationNelE[A] =
+    private def mapResult[B](f: BoundForm[A] => BoundForm[B]): Form[B] =
+      Form(env =>
+        for {
+          aa <- this.runForm(env)
+        } yield f(aa))
+
+    def name(s: String): Form[A] = mapResult(_.copy(name = s.some))
+    def baseSelector(s: String): Form[A] = mapResult(_.copy(baseSelector = s.some))
+
+    private def foldV(a: ValidationNelE[ValidationNelE[A]]): ValidationNelE[A] =
       a.fold(_.failure[A], identity)
 
     def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
@@ -156,14 +183,12 @@ object Forms {
           bb <- b.runForm(env)
           aa <- this.runForm(env)
         } yield {
+          val all = fs.toList.sequenceU.flatten(_._2)
           if (List(bb, aa).exists(_.result.isFailure))
-            aa
+            aa.copy(transform = errTransform(aa, all))
           else {
-            val all = fs.toList.sequenceU.flatten(_._2)
-            val result =
-              foldValResult(
-                ^(bb.result, aa.result)((b, a) =>
-                  all.validation(FormValue(bb.name, b), a)))
+            val result = foldV(^(bb.result, aa.result)((b, a) =>
+              all.validation(FormValue(bb.name, b), a)))
             BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
@@ -179,14 +204,12 @@ object Forms {
           cc <- c.runForm(env)
           aa <- this.runForm(env)
         } yield {
+          val all = fs.toList.sequenceU.flatten(_._3)
           if (List(bb, cc, aa).exists(_.result.isFailure))
-            aa
+            aa.copy(transform = errTransform(aa, all))
           else {
-            val all = fs.toList.sequenceU.flatten(_._3)
-            val result =
-              foldValResult(
-                ^^(bb.result, cc.result, aa.result)((b, c, a) =>
-                    all.validation(FormValue(bb.name, b), FormValue(cc.name, c), a)))
+            val result = foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
+              all.validation(FormValue(bb.name, b), FormValue(cc.name, c), a)))
             BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
@@ -203,14 +226,12 @@ object Forms {
           dd <- d.runForm(env)
           aa <- this.runForm(env)
         } yield {
+          val all = fs.toList.sequenceU.flatten(_._4)
           if (List(bb, cc, dd, aa).exists(_.result.isFailure))
-            aa
+            aa.copy(transform = errTransform(aa, all))
           else {
-            val all = fs.toList.sequenceU.flatten(_._4)
-            val result =
-              foldValResult(
-                ^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
-                  all.validation(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), a)))
+            val result = foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
+              all.validation(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), a)))
             BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
           }
         })
@@ -240,10 +261,8 @@ object Forms {
     implicit val formApplicative: Applicative[Form] = new Applicative[Form] {
       override def map[A, B](a: Form[A])(f: A => B): Form[B] = a map f
 
-      override def point[A](a: => A) =
-        Form(env =>
-          for (_ <- get[FormState])
-          yield BoundForm(a.success, None, None, cssSelZero))
+      override def point[A](a: => A): Form[A] =
+        FormHelpers.liftResult(BoundForm(a.success, None, None, cssSelZero))
 
       override def ap[A,B](fa: => Form[A])(f: => Form[A=>B]): Form[B] =
         fa ap f
@@ -270,10 +289,10 @@ object Forms {
     }
 
     def sel(sel: CssSel, name: Option[String] = None): Form[Unit] =
-      fresult { env => BoundForm(().success, name, None, sel) }
+      fresult { (_, _) => BoundForm(().success, name, None, sel) }
 
-    def fresult[A](f: Env => BoundForm[A]): Form[A] =
-      Form(env => for (_ <- get[FormState]) yield f(env))
+    def fresult[A](f: (Env, FormState) => BoundForm[A]): Form[A] =
+      Form(env => for (s <- get[FormState]) yield f(env, s))
 
     def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
       in.leftMap(_.map(_.copy(label = label)))
@@ -330,6 +349,11 @@ object Forms {
 
     def liftNelStringV[A](in: ValidationNelS[A]): ValidationNelE[A] =
       in.leftMap(_.map(s => FormError(Text(s))))
+
+    def liftResult[A](form: BoundForm[A]): Form[A] =
+      Form(env =>
+        for (_ <- get[FormState])
+        yield form)
   }
 }
 

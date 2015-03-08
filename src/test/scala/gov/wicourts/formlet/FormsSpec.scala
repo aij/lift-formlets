@@ -9,14 +9,11 @@ import Scalaz._
 
 import net.liftweb.util.Helpers.{^ => _, _}
 
-class FormsSpec extends Specification {
+class FormsSpec extends FormletSpec {
   import Forms._
   import Forms.FormHelpers._
 
   val F = Form.F
-
-  def applyNs[A](form: Form[A], ns: NodeSeq): NodeSeq =
-    form.runEmpty._2.transform.apply(ns).head
 
   def testEnv = new Env {
     def param(s: String) =
@@ -29,6 +26,33 @@ class FormsSpec extends Specification {
     "should fail with the provided message" >> {
       val (_, r) = Form.failing("no way!").runEmpty
       r.errors must_== List(Text("no way!"))
+    }
+  }
+
+  "Validations that depend on another field" >> {
+    "should not execute if the dependent field is not valid" >> {
+      val alwaysFails = lift2V[String,String]((bn, a) => liftStringV("not this time".failure))
+      val failingForm = Form.failing[String]("no way!")
+      val a = F.point[String]("ok").val2(failingForm)(alwaysFails)
+
+      a.evalEmpty.result must_== "ok".success
+    }
+
+    "should always apply client-side validation transform" >> {
+      val alwaysFails = lift2V[String,String](
+        (bn, a) => liftStringV("not this time".failure))
+          .setTransform(s => ((s + " [data-foo]") #> "foo"))
+
+      val failingOtherForm = Form.failing[String]("no way!")
+      val failingForm = Form
+        .failing[String]("no way!")
+        .baseSelector("input")
+        .val2(failingOtherForm)(alwaysFails)
+
+      val in = <input />
+      val out = <input data-foo="foo" />
+
+      check(failingForm, in, out)
     }
   }
 
@@ -60,7 +84,7 @@ class FormsSpec extends Specification {
 
     "should not work without calling .memoize" >> {
       val form = F.tuple2(randomResultForm, randomResultForm)
-      val result = form.runEmpty._2.result.toOption
+      val result = form.evalEmpty.result.toOption
 
       result.map(r => r._1 must_!= r._2).getOrElse(1 must_== 2)
     }
@@ -68,7 +92,7 @@ class FormsSpec extends Specification {
     "should work when calling .memoize" >> {
       val memoized = randomResultForm.memoize
       val form = F.tuple2(memoized, memoized)
-      val result = form.runEmpty._2.result.toOption
+      val result = form.evalEmpty.result.toOption
 
       result.map(r => r._1 must_== r._2).getOrElse(1 must_== 2)
     }

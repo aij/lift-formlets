@@ -123,6 +123,7 @@ trait HtmlForms {
     Form(env =>
       for {
         v <- gets[FormState, Option[SelectVar]](__var.get)
+        formName <- gets[FormState, String](_.contextName(name))
         selectOptions <- v.map(state[FormState,SelectVar]).getOrElse {
           val selectState = noncedOptions
           for {
@@ -131,7 +132,7 @@ trait HtmlForms {
         }
       } yield {
         val (defaultNonces, options) = selectOptions
-        val values = env.param(name).flatMap(v => options.find(_.nonce == v))
+        val values = env.param(formName).flatMap(v => options.find(_.nonce == v))
 
         val formValue =
           if (values.nonEmpty) values.map(_.option.value)
@@ -141,7 +142,7 @@ trait HtmlForms {
           if (values.nonEmpty) values.map(_.nonce)
           else defaultNonces
 
-        val (selector, sel) = transform(name, nonces, options)
+        val (selector, sel) = transform(formName, nonces, options)
 
         BoundForm(liftStringV(formValue.success), None, Some(selector), sel)
       }
@@ -169,8 +170,9 @@ trait HtmlForms {
   )(
     implicit serializer: Serializer[Boolean], converter: Converter[Boolean]
   ): Form[Boolean] = {
-    fresult { env =>
-      val userInput = single(env, name)
+    fresult { (env, state) =>
+      val formName = state.contextName(name)
+      val userInput = single(env, formName)
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
@@ -178,10 +180,10 @@ trait HtmlForms {
         Some("input"),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
-            val checkboxNs = <input type="checkbox" name={name} value={serializer(formValue | default)} />
+            val checkboxNs = <input type="checkbox" name={formName} value={serializer(formValue | default)} />
 
             element.attributes.foldLeft(checkboxNs)(_ % _) ++
-            <input type="hidden" name={name} value="false" />
+            <input type="hidden" name={formName} value="false" />
           }
         }})
       }
@@ -196,14 +198,15 @@ trait HtmlForms {
   )(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
   ): Form[Option[A]] = {
-    fresult { env =>
-      val userInput = single(env, name)
+    fresult { (env, state) =>
+      val formName = state.contextName(name)
+      val userInput = single(env, formName)
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
         None,
         Some(baseSelector),
-        nameSelector #> name & valueSelector #> (userInput | serializer(default)))
+        nameSelector #> formName & valueSelector #> (userInput | serializer(default)))
     }
   }
 

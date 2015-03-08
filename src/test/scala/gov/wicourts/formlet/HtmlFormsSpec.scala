@@ -11,7 +11,7 @@ import Scalaz._
 import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.SHtml.SelectableOption
 
-class HtmlFormsSpec extends Specification with XmlMatchers {
+class HtmlFormsSpec extends FormletSpec {
   import Forms._
   import Forms.FormHelpers._
 
@@ -19,13 +19,6 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
   import HtmlForms.DefaultFieldHelpers._
 
   val F = Form.F
-
-  def applyNs[A](form: Form[A], ns: NodeSeq): NodeSeq =
-    form.runEmpty._2.transform.apply(ns).head
-
-  def check[A](form: Form[A], ns: NodeSeq, expected: NodeSeq) = {
-    applyNs(form, ns) must ==/ (expected)
-  }
 
   def testEnv = new Env {
     def param(s: String) =
@@ -63,6 +56,12 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
       val in = <input />
       val out = <input name="test" value="" required="required"></input>
       check(input[String]("test", None).html5Required, in, out)
+    }
+
+    "should support form context" >> {
+      val in = <input />
+      val out = <input name="tc_test" value=""></input>
+      check(input[String]("test", None).context("tc"), in, out)
     }
   }
 
@@ -136,6 +135,14 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
 
       (ns \\ "option").length must_== 3
     }
+
+    "should support form context" >> {
+      val sel = selectSelect("test", None, options).required.context("tc")
+
+      val ns = applyNs(sel, <select></select>)
+
+      (ns \\ "@name").toString must_== "tc_test"
+    }
   }
 
   "A checkbox form" >> {
@@ -148,6 +155,17 @@ class HtmlFormsSpec extends Specification with XmlMatchers {
         </div>
 
       check(checkbox("test", true), in, out)
+    }
+
+    "should support form context" >> {
+      val in = <div><input></input></div>
+      val out =
+        <div>
+          <input type="checkbox" name="tc_test" value="true"/>
+          <input type="hidden" name="tc_test" value="false"/>
+        </div>
+
+      check(checkbox("test", true).context("tc"), in, out)
     }
   }
 
