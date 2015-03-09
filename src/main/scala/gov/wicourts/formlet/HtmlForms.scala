@@ -15,21 +15,34 @@ import scala.language.implicitConversions
 import gov.wicourts.formlet.Forms._
 import gov.wicourts.formlet.Forms.Form._
 
+/** Provides combinators for working with HTML forms */
 trait HtmlForms {
   import FormHelpers._
 
+  /** Serializes a values of type `A` to a `String`. */
   type Serializer[A] = A => String
+
+  /** Converts an input `String` to a value of type `A` */
   type Converter[A] = String => Validation[String,A]
 
   val requiredMessage = "This field is required"
 
+  /** Lifts an optional value of type `A` to a validation of type `A` */
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
 
+  /**
+   * Returns a [[Forms.FormValidation]] that checks that the input exists and also
+   * applies a HTML5 required attribute to the form.
+   */
   def html5Required[A]: FormValidation[Option[A],A] =
     FormValidation(
       a => liftStringV(required(a)),
       Some(s => (s + " [required]") #> "required"))
 
+  /**
+   * Binds the provided form to the provided selector and collects and
+   * binds nested errors.
+   */
   def field[A](selector: String, contents: Form[A]): Form[A] =
     Form(env =>
       for {
@@ -45,21 +58,25 @@ trait HtmlForms {
       }
     )
 
+  /** An `&lt;input&gt;` form */
   def input[A](name: String, default: Option[A])(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
     baseInput("input", "input [name]", "input [value]", name, default)
   }
 
+  /** An `&lt;textarea&gt;` form */
   def textarea[A](name: String, default: Option[A])(
     implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
     baseInput("textarea", "textarea [name]", "textarea *", name, default)
   }
 
+  /** A `SelectableOption` that can be referenced by the provided opaque value. */
   case class SelectableOptionWithNonce[+T](nonce: String, option: SelectableOption[T])
 
+  /** Provides the UI binder for a [[multiSelect]]. */
   type SelectTransformer[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
-  def asLabeledControl[A](
+  private def asLabeledControl[A](
     typeValue: String,
     selectedAttr: String
   )(
@@ -104,7 +121,7 @@ trait HtmlForms {
     ("label", binder)
   }
 
-  def asSelect[A](
+  private def asSelect[A](
     multiple: Boolean
   )(
     name: String, selectedNonces: List[String], options: List[SelectableOptionWithNonce[A]]
@@ -135,6 +152,7 @@ trait HtmlForms {
     ("select", multipleSel & nameSel & "select *" #> <xml:group>{optionsNs}</xml:group>)
   }
 
+  /** A [[multiSelect]] rendered as a `&lt;select multiple&gt;` */
   def selectMultiSelect[A](
     name: String,
     default: List[A],
@@ -142,6 +160,7 @@ trait HtmlForms {
   ): Form[List[A]] =
     multiSelect(name, default, options)(asSelect(true))
 
+  /** A [[multiSelect]] rendered using `&lt;input type="checkbox"&gt;` */
   def checkboxMultiSelect[A](
     name: String,
     default: List[A],
@@ -149,6 +168,11 @@ trait HtmlForms {
   ): Form[List[A]] =
     multiSelect(name, default, options)(asLabeledControl("checkbox", "checked"))
 
+  /** 
+   * Creates a form that selects from a list of values, bound using the provided
+   * [[SelectTransformer]]. In order to select a value, the form must be run
+   * using the the same [[Forms.FormState]] as that used to create the form initially.
+   */
   def multiSelect[A](
     name: String,
     default: List[A],
@@ -201,6 +225,7 @@ trait HtmlForms {
     )
   }
 
+  /** A [[select]] rendered as a `&lt;select&gt;` */
   def selectSelect[A](
     name: String,
     default: Option[A],
@@ -208,6 +233,7 @@ trait HtmlForms {
   ): Form[Option[A]] =
     select(name, default, options)(asSelect(false))
 
+  /** A [[select]] rendered using `&lt;input type="radio"&gt;` */
   def radioSelect[A](
     name: String,
     default: Option[A],
@@ -215,6 +241,7 @@ trait HtmlForms {
   ): Form[Option[A]] =
     select(name, default, options)(asLabeledControl("radio", "selected"))
 
+  /** A [[multiSelect]] that selects a single value */
   def select[A](
     name: String,
     default: Option[A],
@@ -224,6 +251,7 @@ trait HtmlForms {
   ): Form[Option[A]] =
     multiSelect(name, default.toList, options)(transform).map(_.headOption)
 
+  /** A `&lt;input type="checkbox"&gt;` form */
   def checkbox(
     name: String, default: Boolean
   )(
@@ -248,6 +276,7 @@ trait HtmlForms {
       }
     }
 
+  /** A `&lt;input type="file"&gt;` form */
   def file(name: String): Form[Option[FileParamHolder]] = {
     fresult { (env, state) =>
       val formName = state.contextName(name)
@@ -283,8 +312,10 @@ trait HtmlForms {
     }
   }
 
+  /** A `&lt;label&gt;` form */
   def label(label: String): Form[Unit] = sel("label *" #> label, label.some)
 
+  /** [[Converter]] and [[Serializer]] instances for standard types */
   object DefaultFieldHelpers {
     implicit val stringConverter: Converter[String] = s => s.success
 

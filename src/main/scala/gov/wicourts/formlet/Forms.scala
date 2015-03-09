@@ -11,20 +11,44 @@ import Scalaz._
 
 import scala.language.implicitConversions
 
+/**
+ * A implementation of Formlets using the Lift framework.
+ *
+ * References:
+ *  - [[http://groups.inf.ed.ac.uk/links/formlets/]]
+ */
 object Forms {
   val cssSelZero = "nothing" #> PassThru
 
+  /** Represents a form's input */
   trait Env {
+    /** Returns the value of a given parameter */
     def param(name: String): List[String]
+
+    /** Returns an uploaded file with the name of the provided parameter */
     def file(name: String): Option[FileParamHolder]
   }
 
+  /** A form's value is provided as an instance of this type */
   type ValidationNelE[A] = ValidationNel[FormError,A]
+
+  /**
+   * A string validation is an instance of this type. It may be lifted to a
+   * [[ValidationNelE]].
+   */
   type ValidationNelS[A] = ValidationNel[String,A]
 
+  /** Lifts a function returning a String Validation to a [[FormValidation]]. */
   def StringValidation[A](f: A => Validation[String,A]): FormValidation[A,A] =
     FormValidation(a => FormHelpers.liftStringV(f(a)), None)
 
+  /**
+   * @param validation The function that performs the validation
+   * @param transform An optional transform to apply to the form
+   *
+   * @tparam A The input type
+   * @tparam B The output type
+   */
   case class FormValidation[A,B](
     validation: A => ValidationNelE[B],
     transform: Option[String => CssSel] = None
@@ -43,9 +67,14 @@ object Forms {
         }
       )
 
+    /**
+     * Flattens a validation returning a `List[C]` to a validation returning
+     * a `C`.
+     */
     def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
       new FormValidation(a => this.validation(a).map(_ => f(a)), this.transform)
 
+    /** Returns a copy of this [[FormValidation]] with the transform set to the provided function */
     def setTransform(f: String => CssSel): FormValidation[A,B] = this.copy(transform = Some(f))
   }
 
@@ -64,11 +93,20 @@ object Forms {
 
   object FormValidation extends FormValidationInstances
 
+  /**
+   * @param error The error to display
+   * @param label An optional label (for example, the label of a form field)
+   */
   case class FormError(
-    render: NodeSeq,
+    error: NodeSeq,
     label: Option[String] = None
   )
 
+  /**
+   * A named wrapper around a value of type `A` which is used to provide
+   * the current value of dependent form value when validation forms that
+   * depend on other forms.
+   */
   case class FormValue[A](name: Option[String], value: A)
 
   case class FormState (private [formlet] values: Map[String,Any], private [formlet] context: List[String]) {
@@ -82,25 +120,54 @@ object Forms {
     def apply(): FormState = FormState(Map[String,Any](), Nil)
   }
 
+  /**
+   * The result of running a form
+   *
+   * @param result The form's value
+   * @param name An optional name (for example, a form field's label)
+   * @param baseSelector An optional CSS selector that can be used
+   * to make further modifications to the form
+   * @param transform The CSS selector transform to apply to the input template
+   */
   case class BoundForm[A](
     result: ValidationNelE[A],
     name: Option[String],
     baseSelector: Option[String],
     transform: CssSel
   ) {
-    def errors: List[NodeSeq] = result.fold(_.map(_.render).toList, _ => Nil)
+    /** Returns a list of error values or `Nil` if there are no error */
+    def errors: List[NodeSeq] = result.fold(_.map(_.error).toList, _ => Nil)
   }
 
+  /**
+   * All forms are instance of this class
+   *
+   * @tparam A The type of the form's value
+   */
   case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     import Form._
 
+    /**
+     * Runs this form using the provided environment and initial state (defaulting to
+     * an empty state).
+     */
     def run(env: Env, initialState: FormState = FormState()): (FormState, BoundForm[A]) =
       runForm(env).run(initialState)
 
+    /** Runs this form with an empty environment and state */
     def runEmpty: (FormState, BoundForm[A]) = run(emptyEnv)
 
+    /**
+     * Runs this form with an empty environment and returns the result,
+     * discarding any state.
+     */
     def evalEmpty: BoundForm[A] = runEmpty._2
 
+    /**
+     * Returns a form that runs this form and saves the result to the current
+     * `FormState`. Running the resulting form again will return the same result
+     * as long as the same `FormState` is used.
+     */
     def memoize: Form[A] = {
       val __var = new FormStateVar[BoundForm[A]]
       Form(env =>
@@ -113,6 +180,10 @@ object Forms {
         } yield w)
     }
 
+    /**
+     * Returns a form that runs this form in the provided context. This is used
+     * to scope form field input names.
+     */
     def context(c: String): Form[A] = {
       Form(env =>
         for {
@@ -138,6 +209,11 @@ object Forms {
           Form.combineBaseSelectors(aa, ff),
           aa.transform & ff.transform))
 
+    /**
+     * Returns a form that maps the form's result through the provided
+     * form validation. The returned form will apply the form validation's
+     * transform to this form's result.
+     */
     def mapV[B](f: FormValidation[A,B]): Form[B] =
       Form(env =>
         for {
@@ -159,9 +235,14 @@ object Forms {
       e getOrElse aa.transform
     }
 
+    /**
+     * A convenience method that maps this form through a string-based
+     * validation.
+     */
     def mapStringV[B](f: A => Validation[String,B]): Form[B] =
       this.mapV(FormValidation(a => FormHelpers.liftStringV(f(a)), None))
 
+    /** Applies an arbitrary number of form validations to this form. */
     def ??(fs: FormValidation[A,A]*): Form[A] =
       this.mapV(fs.toList.sequenceU.flatten(identity))
 
@@ -171,12 +252,16 @@ object Forms {
           aa <- this.runForm(env)
         } yield f(aa))
 
+    /** Modifies the result of this form to have the name provided */
     def name(s: String): Form[A] = mapResult(_.copy(name = s.some))
+
+    /** Modifies the result of this form to have the base selector provided */
     def baseSelector(s: String): Form[A] = mapResult(_.copy(baseSelector = s.some))
 
     private def foldV(a: ValidationNelE[ValidationNelE[A]]): ValidationNelE[A] =
       a.fold(_.failure[A], identity)
 
+    /** Validates this form using the result of another form as input. */
     def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
       Form(env =>
         for {
@@ -193,6 +278,7 @@ object Forms {
           }
         })
 
+    /** Validates this form using the result of two other forms as input. */
     def val3[B,C](
       b: Form[B], c: Form[C]
     )(
@@ -214,6 +300,7 @@ object Forms {
           }
         })
 
+    /** Validates this form using the result of three other forms as input. */
     def val4[B,C,D](
       b: Form[B], c: Form[C], d: Form[D]
     )(
@@ -236,6 +323,10 @@ object Forms {
           }
         })
 
+    /**
+     * Lifts a form returning a validation into a form that returns a value of
+     * the type of validation
+     */
     def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
       Form(env =>
         for {
@@ -246,6 +337,10 @@ object Forms {
           aa.baseSelector,
           aa.transform))
 
+    /**
+     * Lifts a form returning a string-based validation into a form that
+     * returns a value of the type of validation
+     */
     def liftStringV[C](implicit ev: A <:< ValidationNelS[C]): Form[C] =
       Form(env =>
         for {
@@ -284,16 +379,20 @@ object Forms {
       }
     }
 
+    /** Returns a form that always fails with the provided message */
     def failing[A](message: String): Form[A] = {
       F.point(message.failure.toValidationNel).liftStringV
     }
 
+    /** Returns a form that applies the provided selector and name */
     def sel(sel: CssSel, name: Option[String] = None): Form[Unit] =
       fresult { (_, _) => BoundForm(().success, name, None, sel) }
 
+    /** A convenience method for defining a form using a function */
     def fresult[A](f: (Env, FormState) => BoundForm[A]): Form[A] =
       Form(env => for (s <- get[FormState]) yield f(env, s))
 
+    /** Returns a copy of the provided validation with the label set to a new value */
     def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
       in.leftMap(_.map(_.copy(label = label)))
   }
@@ -308,48 +407,58 @@ object Forms {
       formState.copy(values = formState.values + (key -> value))
   }
 
+  /** Returns an [[Env]] implementation that uses Lift's request handling framework */
   def paramsEnv: Env = new Env {
     def param(s: String) = S.params(s).map(_.trim).filter(_.isEmpty)
     def file(s: String) = S.request.flatMap(_.uploadedFiles.find(_.name == s))
   }
 
+  /** Returns an [[Env]] that always returns nothing */
   def emptyEnv: Env = new Env {
     def param(s: String) = Nil
     def file(s: String) = None
   }
 
+  /** Creates a testing environment using the provided map */
   def singleEnv(m: Map[String, String]): Env = new Env {
     def param(s: String) = m.get(s).toList
     def file(s: String) = None
   }
 
+  /** Creates a testing environment using the provided map */
   def multiEnv(m: Map[String, List[String]]): Env = new Env {
     def param(s: String) = m.getOrElse(s, Nil)
     def file(s: String) = None
   }
 
-  def single(env: Env, name: String): Option[String] = env.param(name).headOption
+  private [formlet] def single(env: Env, name: String): Option[String] = env.param(name).headOption
 
   object FormHelpers {
+    /** Lifts a function of two parameters into the equivalent [[FormValidation]] */
     def lift2V[A,B](f: (FormValue[B], A) => ValidationNelE[A]): FormValidation[(FormValue[B],A),A] =
       FormValidation({ case (bn, a) => f(bn, a) }, None)
 
+    /** Lifts a function of three parameters into the equivalent [[FormValidation]] */
     def lift3V[A,B,C](
       f: (FormValue[B], FormValue[C], A) => ValidationNelE[A]
     ): FormValidation[(FormValue[B],FormValue[C],A),A] =
       FormValidation({ case (bn, cn, a) => f(bn, cn, a) }, None)
 
+    /** Lifts a function of four parameters into the equivalent [[FormValidation]] */
     def lift4V[A,B,C,D](
       f: (FormValue[B], FormValue[C], FormValue[D], A) => ValidationNelE[A]
     ): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
       FormValidation({ case (bn, cn, dn, a) => f(bn, cn, dn, a) }, None)
 
+    /** Lifts a string-based validation into the validation used by a form's result */
     def liftStringV[A](in: Validation[String,A]): ValidationNelE[A] =
       in.leftMap(s => FormError(Text(s))).toValidationNel
 
+    /** Lifts a list of string-based validations into the validation used by a form's result */
     def liftNelStringV[A](in: ValidationNelS[A]): ValidationNelE[A] =
       in.leftMap(_.map(s => FormError(Text(s))))
 
+    /** Lifts a form's result into a form that always returns that result when run */
     def liftResult[A](form: BoundForm[A]): Form[A] =
       Form(env =>
         for (_ <- get[FormState])
