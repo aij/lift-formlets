@@ -68,7 +68,7 @@ class HtmlFormsSpec extends FormletSpec {
   "A field form" >> {
     "should be named by its label" >> {
       val (_, r) = field(".test", label("test label")).runEmpty
-      r.name must_== Some("test label")
+      r.name must_== "test label".some
     }
 
     "should set error label to its label" >> {
@@ -90,7 +90,7 @@ class HtmlFormsSpec extends FormletSpec {
     "should be able to bind directly to an <input>" >> {
       val in = <input class="testClass"></input>
       val out = <input name="testName" class="testClass" value="v"></input>
-      check(field(".testClass", input("testName", Some("v"))), in, out)
+      check(field(".testClass", input("testName", "v".some)), in, out)
     }
   }
 
@@ -101,16 +101,16 @@ class HtmlFormsSpec extends FormletSpec {
     }
 
     "should succeed if form has a value" >> {
-      val (_, r) = F.point(Some("hi")).mapStringV(required).runEmpty
+      val (_, r) = F.point("hi".some).mapStringV(required).runEmpty
       r.result must_== "hi".success
     }
   }
 
   "A select form" >> {
     val options = List(
-      SelectableOption(1, "one"),
-      SelectableOption(2, "two"),
-      SelectableOption(3, "three"))
+      SelectableOption(1, "one", "id" -> "oneoneone"),
+      SelectableOption(2, "two", "id" -> "twotwotwo"),
+      SelectableOption(3, "three", "id" -> "threethreethree"))
 
     "should be able to select a value from its saved state" >> {
       def transform[A](
@@ -128,6 +128,16 @@ class HtmlFormsSpec extends FormletSpec {
       r2.result must_== 2.success
     }
 
+    "should support form context" >> {
+      val sel = selectSelect("test", None, options).required.context("tc")
+
+      val ns = applyNs(sel, <select></select>)
+
+      (ns \\ "@name").toString must_== "tc_test"
+    }
+
+    // A few basic smoke tests
+
     "should be able to render to a <select>" >> {
       val sel = selectSelect("test", None, options).required
 
@@ -136,12 +146,39 @@ class HtmlFormsSpec extends FormletSpec {
       (ns \\ "option").length must_== 3
     }
 
-    "should support form context" >> {
-      val sel = selectSelect("test", None, options).required.context("tc")
+    "should be able to render to a <select multiple>" >> {
+      val sel = selectMultiSelect("test", Nil, options)
 
       val ns = applyNs(sel, <select></select>)
 
-      (ns \\ "@name").toString must_== "tc_test"
+      (ns \\ "@multiple").toString must_== "multiple"
+      (ns \\ "option").length must_== 3
+    }
+
+    "should be able to render to radio buttons" >> {
+      val input =
+        <div>
+          <label><input type="radio" /></label>
+        </div>
+
+      val form = radioSelect("test", None, options).required
+      val ns = applyNs(form, input)
+
+      (ns \\ "label").length must_== 3
+      (ns \\ "input" \\ "@type").distinct.toString must_== "radio"
+    }
+
+    "should be able to render to checkbox controls" >> {
+      val input =
+        <div>
+          <label><input type="checkbox" /></label>
+        </div>
+
+      val form = checkboxMultiSelect("test", Nil, options)
+      val ns = applyNs(form, input)
+
+      (ns \\ "label").length must_== 3
+      (ns \\ "input" \\ "@type").distinct.toString must_== "checkbox"
     }
   }
 
@@ -169,6 +206,15 @@ class HtmlFormsSpec extends FormletSpec {
     }
   }
 
+  "A file form" >> {
+    "should be able to render itself and support form context" >> {
+      val in = <input />
+      val out = <input type="file" name="tc_test" />
+
+      check(file("test").context("tc"), in, out)
+    }
+  }
+
   // Example code
   "Composite forms" >> {
     case class FullName(firstName: String, lastName: String)
@@ -185,7 +231,7 @@ class HtmlFormsSpec extends FormletSpec {
     }
 
     "using Frank example #1" >> {
-      val requiredFirstName = input("firstName", Some("Frank")).required
+      val requiredFirstName = input("firstName", "Frank".some).required
 
       def mkFirstName(input: Form[String]): Form[String] =
         field(".firstName", input <* label("First name"))
@@ -194,7 +240,7 @@ class HtmlFormsSpec extends FormletSpec {
 
       val lastName = field(
         ".lastName",
-        input("lastName", Some("Johnson")).required <* label("Last name")
+        input("lastName", "Johnson".some).required <* label("Last name")
       )
 
 

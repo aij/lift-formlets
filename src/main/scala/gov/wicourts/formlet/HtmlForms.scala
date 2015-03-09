@@ -1,7 +1,7 @@
 package gov.wicourts.formlet
 
 import net.liftweb.http.{S, FileParamHolder}
-import net.liftweb.http.SHtml.SelectableOption
+import net.liftweb.http.SHtml.{BasicElemAttr, SelectableOption}
 import net.liftweb.util._
 import net.liftweb.util.Helpers.{^ => _, _}
 
@@ -59,6 +59,51 @@ trait HtmlForms {
 
   type SelectTransformer[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
+  def asLabeledControl[A](
+    typeValue: String,
+    selectedAttr: String
+  )(
+    name: String, selectedNonces: List[String], noncedOptions: List[SelectableOptionWithNonce[A]]
+  ): (String, CssSel) = {
+    val binder =
+      "label" #> noncedOptions.map { noncedOption =>
+        val nonce = noncedOption.nonce
+        val option = noncedOption.option
+        val controlBinder =
+          s"type=$typeValue [name]" #> name &
+          s"type=$typeValue [value]" #> nonce &
+          s"type=$typeValue [$selectedAttr]" #> Some(selectedAttr).filter(_ => selectedNonces.contains(nonce))
+
+        val (idAttribute, controlBinderWithAttributes) =
+          option.attrs.foldLeft((None: Option[String], controlBinder)) { (binderSoFar, attribute) =>
+            attribute match {
+              case BasicElemAttr(name, value) =>
+                val updatedBinder =
+                  binderSoFar._2 &
+                  (s"type=$typeValue [$name]") #> value
+
+                if (name == "id")
+                  (value.some, updatedBinder)
+                else
+                  (binderSoFar._1, updatedBinder)
+              case _ =>
+                binderSoFar
+            }
+          }
+
+        "label" #> { ns: NodeSeq => ns match {
+          case label: Elem if label.label == "label" =>
+            val nonTextChildren = label.child.filterNot(_.isInstanceOf[Text])
+
+            val updatedLabel =
+              idAttribute.foldLeft(label.copy(child = nonTextChildren ++ Text(" " + option.label)))(_ % ("for", _))
+
+            controlBinderWithAttributes apply updatedLabel
+        } } & controlBinderWithAttributes
+      }
+    ("label", binder)
+  }
+
   def asSelect[A](
     multiple: Boolean
   )(
@@ -96,6 +141,13 @@ trait HtmlForms {
     options: List[SelectableOption[A]]
   ): Form[List[A]] =
     multiSelect(name, default, options)(asSelect(true))
+
+  def checkboxMultiSelect[A](
+    name: String,
+    default: List[A],
+    options: List[SelectableOption[A]]
+  ): Form[List[A]] =
+    multiSelect(name, default, options)(asLabeledControl("checkbox", "checked"))
 
   def multiSelect[A](
     name: String,
@@ -144,7 +196,7 @@ trait HtmlForms {
 
         val (selector, sel) = transform(formName, nonces, options)
 
-        BoundForm(liftStringV(formValue.success), None, Some(selector), sel)
+        BoundForm(liftStringV(formValue.success), None, selector.some, sel)
       }
     )
   }
@@ -155,6 +207,13 @@ trait HtmlForms {
     options: List[SelectableOption[A]]
   ): Form[Option[A]] =
     select(name, default, options)(asSelect(false))
+
+  def radioSelect[A](
+    name: String,
+    default: Option[A],
+    options: List[SelectableOption[A]]
+  ): Form[Option[A]] =
+    select(name, default, options)(asLabeledControl("radio", "selected"))
 
   def select[A](
     name: String,
@@ -177,7 +236,7 @@ trait HtmlForms {
       BoundForm(
         liftStringV(formValue),
         None,
-        Some("input"),
+        "input".some,
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
             val checkboxNs = <input type="checkbox" name={formName} value={serializer(formValue | default)} />
@@ -188,6 +247,20 @@ trait HtmlForms {
         }})
       }
     }
+
+  def file(name: String): Form[Option[FileParamHolder]] = {
+    fresult { (env, state) =>
+      val formName = state.contextName(name)
+      val result = env.file(formName)
+
+      BoundForm(
+        result.success,
+        None,
+        "input".some,
+        "input [name]" #> formName & "input [type]" #> "file"
+      )
+    }
+  }
 
   private def baseInput[A](
     baseSelector: String,
@@ -205,12 +278,12 @@ trait HtmlForms {
       BoundForm(
         liftStringV(formValue),
         None,
-        Some(baseSelector),
+        baseSelector.some,
         nameSelector #> formName & valueSelector #> (userInput | serializer(default)))
     }
   }
 
-  def label(label: String): Form[Unit] = sel("label *" #> label, Some(label))
+  def label(label: String): Form[Unit] = sel("label *" #> label, label.some)
 
   object DefaultFieldHelpers {
     implicit val stringConverter: Converter[String] = s => s.success
