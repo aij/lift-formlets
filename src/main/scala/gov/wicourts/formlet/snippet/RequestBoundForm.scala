@@ -8,6 +8,15 @@ import gov.wicourts.formlet._
 
 import xml._
 
+trait RequestBoundForm[A] {
+  protected val formState = RequestBoundForm.newFormState
+
+  protected def form: Form[A]
+
+  def binder(process: A => Unit): NodeSeq => NodeSeq =
+    RequestBoundForm.create(formState, form)(process)
+}
+
 object RequestBoundForm {
   def newFormState: RequestVar[FormState] = {
     new RequestVar[FormState](FormState(false)) {

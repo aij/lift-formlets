@@ -10,12 +10,14 @@ import Scalaz._
 
 import net.liftweb.util.Helpers._
 
-object Form1 {
-  val formState = RequestBoundForm.newFormState
-
-  def form: Form[Option[String]] = 
-    field(".fullName", 
+object Form1 extends RequestBoundForm[Option[String]] {
+  protected def form: Form[Option[String]] =
+    field(".fullName",
       label("Full name") *> input("fullName", none[String]))
 
-  def render = ".form1" #> RequestBoundForm.create(formState, form)(a => println("Got a " + a))
+  private def process(a: Option[String]): Unit = {
+    println("Got a " + a)
+  }
+
+  def render = ".form1" #> binder(process)
 }
