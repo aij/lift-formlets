@@ -12,8 +12,7 @@ import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.SHtml.SelectableOption
 
 class HtmlFormsSpec extends FormletSpec {
-  import Forms._
-  import Forms.FormHelpers._
+  import FormHelpers._
 
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
@@ -123,7 +122,7 @@ class HtmlFormsSpec extends FormletSpec {
 
       val (s, r) = sel.runEmpty
       val nonces = r.transform.apply(<div></div>).toString.split(",")
-      val (_, r2) = sel.run(singleEnv(Map("test" -> nonces(1))), s)
+      val (_, r2) = sel.run(Env.singleEnv(Map("test" -> nonces(1))), s)
 
       r2.result must_== 2.success
     }
@@ -261,7 +260,7 @@ class HtmlFormsSpec extends FormletSpec {
 
       "if any parts of the whole fail validation, so does the whole" >> {
         // Simulate a user entry of Joe for firstName
-        val env = singleEnv(Map("firstName" -> "Joe"))
+        val env = Env.singleEnv(Map("firstName" -> "Joe"))
         val frankFirstName = mkFirstName(requiredFirstName ?? (
           StringValidation(s => if (s.startsWith("Frank")) s.success else "Only Frank is allowed".failure)))
 
@@ -315,13 +314,13 @@ class HtmlFormsSpec extends FormletSpec {
       }
 
       "will return a FullName if both are set" >> {
-        val env = singleEnv(Map("firstName" -> "Frank", "lastName" -> "Johnson"))
+        val env = Env.singleEnv(Map("firstName" -> "Frank", "lastName" -> "Johnson"))
         val (_, r) = fullName.run(env)
         r.result must_== FullName("Frank", "Johnson").some.success
       }
 
       "will return an error if only last name is set" >> {
-        val env = singleEnv(Map("lastName" -> "Johnson"))
+        val env = Env.singleEnv(Map("lastName" -> "Johnson"))
         val (_, r) = fullName.run(env)
         r.errors must_== List(Text("This field is required if the Last name field is set"))
       }

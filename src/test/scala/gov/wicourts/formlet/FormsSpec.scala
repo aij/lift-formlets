@@ -10,8 +10,7 @@ import Scalaz._
 import net.liftweb.util.Helpers.{^ => _, _}
 
 class FormsSpec extends FormletSpec {
-  import Forms._
-  import Forms.FormHelpers._
+  import FormHelpers._
 
   val F = Form.F
 
@@ -80,7 +79,7 @@ class FormsSpec extends FormletSpec {
           randomString(10).success,
           None,
           None,
-          Forms.cssSelZero))
+          cssSelZero))
 
     "should not work without calling .memoize" >> {
       val form = F.tuple2(randomResultForm, randomResultForm)

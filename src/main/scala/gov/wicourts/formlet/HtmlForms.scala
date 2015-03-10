@@ -10,10 +10,7 @@ import xml._
 import scalaz._
 import Scalaz._
 
-import scala.language.implicitConversions
-
-import gov.wicourts.formlet.Forms._
-import gov.wicourts.formlet.Forms.Form._
+import gov.wicourts.formlet.Form._
 
 /** Provides combinators for working with HTML forms */
 trait HtmlForms {
@@ -31,7 +28,7 @@ trait HtmlForms {
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
 
   /**
-   * Returns a [[Forms.FormValidation]] that checks that the input exists and also
+   * Returns a [[FormValidation]] that checks that the input exists and also
    * applies a HTML5 required attribute to the form.
    */
   def html5Required[A]: FormValidation[Option[A],A] =
@@ -46,15 +43,20 @@ trait HtmlForms {
   def field[A](selector: String, contents: Form[A]): Form[A] =
     Form(env =>
       for {
+        s <- get[FormState]
         aa <- contents.runForm(env)
       } yield {
-        // XXX This needs to be more flexible
-        val errorsCssSel = ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
+        val errSel =
+          if (s.renderErrors_?)
+            // XXX This needs to be more flexible
+            ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
+          else
+            cssSelZero
         BoundForm(
           setLabel(aa.result, aa.name),
           aa.name,
           aa.baseSelector,
-          selector #> (aa.transform & errorsCssSel))
+          selector #> (aa.transform & errSel))
       }
     )
 
@@ -168,10 +170,10 @@ trait HtmlForms {
   ): Form[List[A]] =
     multiSelect(name, default, options)(asLabeledControl("checkbox", "checked"))
 
-  /** 
+  /**
    * Creates a form that selects from a list of values, bound using the provided
    * [[SelectTransformer]]. In order to select a value, the form must be run
-   * using the the same [[Forms.FormState]] as that used to create the form initially.
+   * using the the same [[FormState]] as that used to create the form initially.
    */
   def multiSelect[A](
     name: String,
@@ -259,7 +261,7 @@ trait HtmlForms {
   ): Form[Boolean] = {
     fresult { (env, state) =>
       val formName = state.contextName(name)
-      val userInput = single(env, formName)
+      val userInput = Env.single(env, formName)
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
@@ -302,7 +304,7 @@ trait HtmlForms {
   ): Form[Option[A]] = {
     fresult { (env, state) =>
       val formName = state.contextName(name)
-      val userInput = single(env, formName)
+      val userInput = Env.single(env, formName)
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
@@ -336,6 +338,8 @@ trait HtmlForms {
 trait LowPriorityHtmlFormsFunctions extends HtmlForms {
   H =>
 
+  import scala.language.implicitConversions
+
   class FormOps[A](form: Form[A]) {}
 
   implicit def formToFormOps[A](form: Form[A]): FormOps[A] =
@@ -344,6 +348,8 @@ trait LowPriorityHtmlFormsFunctions extends HtmlForms {
 
 trait HtmlFormsFunctions extends LowPriorityHtmlFormsFunctions {
   H =>
+
+  import scala.language.implicitConversions
 
   class OptFormOps[A](form: Form[Option[A]]) {
     def required: Form[A] = form.mapStringV(H.required _)
