@@ -21,7 +21,7 @@ trait Env {
 object Env {
   /** Returns an [[Env]] implementation that uses Lift's request handling framework */
   def paramsEnv: Env = new Env {
-    def param(s: String) = S.params(s).map(_.trim).filter(_.isEmpty)
+    def param(s: String) = S.params(s).map(_.trim).filterNot(_.isEmpty)
     def file(s: String) = S.request.flatMap(_.uploadedFiles.find(_.name == s))
   }
 

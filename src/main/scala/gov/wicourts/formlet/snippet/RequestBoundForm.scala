@@ -9,11 +9,13 @@ import gov.wicourts.formlet._
 import xml._
 
 object RequestBoundForm {
-  def create[A](form: => Form[A])(process: A => Unit): NodeSeq => NodeSeq = {
-    object formState extends RequestVar[FormState](FormState(false)) {
+  def newFormState: RequestVar[FormState] = {
+    new RequestVar[FormState](FormState(false)) {
       override lazy val __nameSalt = Helpers.nextFuncName
     }
+  }
 
+  def create[A](formState: RequestVar[FormState], form: => Form[A])(process: A => Unit): NodeSeq => NodeSeq = {
     def processResult_? = formState.get.renderErrors_?
 
     val env =
