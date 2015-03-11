@@ -22,8 +22,9 @@ class Boot {
 
     // Build SiteMap
     val entries = List(
-      Menu.i("Home") / "index", // the simple way to declare a menu
-      Menu.i("Form 1") / "form1", // the simple way to declare a menu
+      Menu.i("Home") / "index",
+      Menu.i("Form 1") / "form1",
+      Menu.i("Form 2") / "form2",
 
       // more complex because this menu allows anything in the
       // /static path to be visible

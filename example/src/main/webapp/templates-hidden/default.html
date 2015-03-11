@@ -3,30 +3,36 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>lift-formlet examples</title>
-    <link rel="stylesheet" href="/static/foundation-5.5.1/css/foundation.css" />
+    <title data-lift="Menu.title">lift-formlet examples: </title>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/foundation/5.5.1/css/foundation.css" />
     <link rel="stylesheet" href="/static/css/example.css" />
-    <script src="/static/foundation-5.5.1/js/vendor/modernizr.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/foundation/5.5.1/js/vendor/modernizr.js"></script>
   </head>
   <body>
 
     <div class="row">
       <div class="large-12 columns">
-        <h1>lift-formlet examples</h1>
+        <header>
+          <h1>lift-formlet examples</h1>
+        </header>
       </div>
     </div>
 
     <div class="row">
       <div class="large-4 columns">
-        <span data-lift="FoundationMenuBuilder?linkToSelf=true"></span>
+        <nav>
+          <span data-lift="FoundationMenuBuilder?linkToSelf=true"></span>
+        </nav>
       </div>
       <div class="large-8 columns">
-        <div id="content">The main content will get bound here</div>
+        <main>
+          <div id="content">The main content will get bound here</div>
+        </main>
       </div>
     </div>
 
-    <script src="/static/foundation-5.5.1/js/vendor/jquery.js"></script>
-    <script src="/static/foundation-5.5.1/js/foundation.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/foundation/5.5.1/js/vendor/jquery.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/foundation/5.5.1/js/foundation.min.js"></script>
     <script>
       $(document).foundation();
     </script>
