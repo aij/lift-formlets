@@ -250,7 +250,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   def mapStringV[B](f: A => Validation[String,B]): Form[B] =
     this.mapV(FormValidation(a => FormHelpers.liftStringV(f(a)), None))
 
-  /** Applies an arbitrary number of form validations to this form. */
+  /** Validates this form using the provided validations */
   def ??(fs: FormValidation[A,A]*): Form[A] =
     this.mapV(fs.toList.sequenceU.flatten(identity))
 
@@ -331,17 +331,17 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
           }
         })
 
-    /**
-      * Lifts a form returning a validation into a form that returns a value of
-      * the type of validation
-      */
-    def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
-      Form(env =>
-        for {
-          aa <- this.runForm(env)
-        } yield BoundForm(
-          aa.result.fold(_.failure[C], a => a: ValidationNelE[C]),
-          aa.label,
+  /**
+    * Lifts a form returning a validation into a form that returns a value of
+    * the type of validation
+    */
+  def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
+    Form(env =>
+      for {
+        aa <- this.runForm(env)
+      } yield BoundForm(
+        aa.result.fold(_.failure[C], a => a: ValidationNelE[C]),
+        aa.label,
         aa.baseSelector,
         aa.transform))
 

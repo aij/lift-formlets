@@ -67,7 +67,7 @@ class HtmlFormsSpec extends FormletSpec {
   "A field form" >> {
     "should be named by its label" >> {
       val (_, r) = field(".test", label("test label")).runEmpty
-      r.name must_== "test label".some
+      r.label must_== "test label".some
     }
 
     "should set error label to its label" >> {
@@ -296,7 +296,7 @@ class HtmlFormsSpec extends FormletSpec {
       def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): ValidationNelE[Option[A]] = {
         val result =
           if (bn.value.isDefined && a.isEmpty)
-            ("This field is required if the " + bn.name.getOrElse("N/A") + " field is set").failure
+            ("This field is required if the " + bn.label.getOrElse("N/A") + " field is set").failure
           else
             a.success
         liftStringV(result)
