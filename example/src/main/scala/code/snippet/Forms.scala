@@ -32,10 +32,6 @@ object Form2 {
   // name and then the for attribute on the <label> and the id on the <input>
   // is also set to this name. Finally, .<name> is used as the selector to a
   // field form to provide the necessary context.
-  //
-  // The utility here might be a little questionable, but it does serve as an
-  // example of how primitive forms can be easily composed to bind to
-  // application-specific HTML.
   def inputField[A](
     name: String, labelText: String, default: Option[A]
   )(
