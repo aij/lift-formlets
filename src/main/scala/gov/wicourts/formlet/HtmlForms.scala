@@ -53,8 +53,8 @@ trait HtmlForms {
           else
             cssSelZero
         BoundForm(
-          setLabel(aa.result, aa.name),
-          aa.name,
+          setLabel(aa.result, aa.label),
+          aa.label,
           aa.baseSelector,
           selector #> (aa.transform & errSel))
       }

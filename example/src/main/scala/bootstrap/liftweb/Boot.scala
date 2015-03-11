@@ -28,7 +28,7 @@ class Boot {
       // more complex because this menu allows anything in the
       // /static path to be visible
       Menu(Loc("Static", Link(List("static"), true, "/static/index"),
-	       "Static Content")))
+	       "Static Content", Hidden)))
 
     // set the sitemap.  Note if you don't want access control for
     // each page, just comment this line out.
@@ -47,8 +47,5 @@ class Boot {
 
     //Init the jQuery module, see http://liftweb.net/jquery for more information.
     LiftRules.jsArtifacts = JQueryArtifacts
-    JQueryModule.InitParam.JQuery=JQueryModule.JQuery191
-    JQueryModule.init()
-
   }
 }

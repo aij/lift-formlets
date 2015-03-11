@@ -111,7 +111,7 @@ case class FormError(
   * the current value of dependent form value when validating forms that
   * depend on other forms.
   */
-case class FormValue[A](name: Option[String], value: A)
+case class FormValue[A](label: Option[String], value: A)
 
 case class FormState (
   private [formlet] values: Map[String,Any],
@@ -132,14 +132,14 @@ object FormState {
   * The result of running a form
   *
   * @param result The form's value
-  * @param name An optional name (for example, a form field's label)
+  * @param label An optional label (for example, a form field's label)
   * @param baseSelector An optional CSS selector that can be used
   * to make further modifications to the form
   * @param transform The CSS selector transform to apply to the input template
   */
 case class BoundForm[A](
   result: ValidationNelE[A],
-  name: Option[String],
+  label: Option[String],
   baseSelector: Option[String],
   transform: CssSel
 ) {
@@ -213,7 +213,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         ff <- f.runForm(env)
       } yield BoundForm(
         aa.result <*> ff.result,
-        Form.combineNames(aa, ff),
+        Form.combineLabels(aa, ff),
         Form.combineBaseSelectors(aa, ff),
         aa.transform & ff.transform))
 
@@ -229,7 +229,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       } yield {
         BoundForm(
           aa.result map f.validation,
-          aa.name,
+          aa.label,
           aa.baseSelector,
           errTransform(aa, f))
       }).liftV
@@ -260,8 +260,8 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield f(aa))
 
-  /** Modifies the result of this form to have the name provided */
-  def name(s: String): Form[A] = mapResult(_.copy(name = s.some))
+  /** Modifies the result of this form to have the label provided */
+  def label(s: String): Form[A] = mapResult(_.copy(label = s.some))
 
   /** Modifies the result of this form to have the base selector provided */
   def baseSelector(s: String): Form[A] = mapResult(_.copy(baseSelector = s.some))
@@ -281,8 +281,8 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
           aa.copy(transform = errTransform(aa, all))
         else {
           val result = foldV(^(bb.result, aa.result)((b, a) =>
-            all.validation(FormValue(bb.name, b), a)))
-          BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
+            all.validation(FormValue(bb.label, b), a)))
+          BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
         }
       })
 
@@ -303,8 +303,8 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
           aa.copy(transform = errTransform(aa, all))
         else {
           val result = foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
-            all.validation(FormValue(bb.name, b), FormValue(cc.name, c), a)))
-          BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
+            all.validation(FormValue(bb.label, b), FormValue(cc.label, c), a)))
+          BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
         }
       })
 
@@ -326,22 +326,22 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
           aa.copy(transform = errTransform(aa, all))
         else {
           val result = foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
-            all.validation(FormValue(bb.name, b), FormValue(cc.name, c), FormValue(dd.name, d), a)))
-          BoundForm(result, aa.name, aa.baseSelector, errTransform(aa, all))
-        }
-      })
+            all.validation(FormValue(bb.label, b), FormValue(cc.label, c), FormValue(dd.label, d), a)))
+            BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
+          }
+        })
 
-  /**
-    * Lifts a form returning a validation into a form that returns a value of
-    * the type of validation
-    */
-  def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
-    Form(env =>
-      for {
-        aa <- this.runForm(env)
-      } yield BoundForm(
-        aa.result.fold(_.failure[C], a => a: ValidationNelE[C]),
-        aa.name,
+    /**
+      * Lifts a form returning a validation into a form that returns a value of
+      * the type of validation
+      */
+    def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
+      Form(env =>
+        for {
+          aa <- this.runForm(env)
+        } yield BoundForm(
+          aa.result.fold(_.failure[C], a => a: ValidationNelE[C]),
+          aa.label,
         aa.baseSelector,
         aa.transform))
 
@@ -355,7 +355,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield BoundForm(
         aa.result.fold(_.failure[C], a => FormHelpers.liftNelStringV(a)),
-        aa.name,
+        aa.label,
         aa.baseSelector,
         aa.transform))
 }
@@ -375,8 +375,8 @@ trait FormInstances {
 object Form extends FormInstances {
   val F = Applicative[Form]
 
-  def combineNames[A,B](a: BoundForm[A], b: BoundForm[B]): Option[String] = {
-    Some(List(a.name, b.name).flatten.mkString(" and ")).filterNot(_.isEmpty)
+  def combineLabels[A,B](a: BoundForm[A], b: BoundForm[B]): Option[String] = {
+    Some(List(a.label, b.label).flatten.mkString(" and ")).filterNot(_.isEmpty)
   }
 
   def combineBaseSelectors[A,B](a: BoundForm[A], b: BoundForm[B]): Option[String] = {
@@ -392,9 +392,9 @@ object Form extends FormInstances {
     F.point(message.failure.toValidationNel).liftStringV
   }
 
-  /** Returns a form that applies the provided selector and name */
-  def sel(sel: CssSel, name: Option[String] = None): Form[Unit] =
-    fresult { (_, _) => BoundForm(().success, name, None, sel) }
+  /** Returns a form that applies the provided selector and label */
+  def sel(sel: CssSel, label: Option[String] = None): Form[Unit] =
+    fresult { (_, _) => BoundForm(().success, label, None, sel) }
 
   /** A convenience method for defining a form using a function */
   def fresult[A](f: (Env, FormState) => BoundForm[A]): Form[A] =

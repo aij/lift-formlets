@@ -1,0 +1,10 @@
+ul {
+  list-style-type: none;
+}
+
+#lift__noticesContainer__ ul {
+  font-size: inherit;
+  margin-left: 0;
+  margin-bottom: 0;
+}
+

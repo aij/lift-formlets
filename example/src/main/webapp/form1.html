@@ -3,13 +3,13 @@
 <body data-lift-content-id="main">
   <div id="main" data-lift="surround?with=default;at=content">
     <h2>A first form!</h2>
-    <div data-lift="Msgs?showAll=true"></div>
+    <div data-lift="FoundationMsgs?showAll=true"></div>
     <form data-lift="Form1" class="form1" method="POST">
       <div class="fullName">
-        <label>fullName label</label>
-        <input type="text">
+        <label for="fullName">fullName label</label>
+        <input id="fullName" type="text">
       </div>
-      <input type="submit" value="Submit">
+      <input type="submit" value="Submit" class="button success">
     </form>
   </div>
 </body>
