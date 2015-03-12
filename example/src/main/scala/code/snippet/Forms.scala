@@ -29,9 +29,9 @@ object Form1 {
 object Form2 {
   // An example combinator that composes several forms (four to be exact).
   // labelText is bound to a <label>. An <input> is bound with the provided
-  // name and then the for attribute on the <label> and the id on the <input>
-  // is also set to this name. Finally, .<name> is used as the selector to a
-  // field form to provide the necessary context.
+  // name and then the for attribute on the <label> and the id attribute on the
+  // <input> is also set to this name. Finally, .<name> is used as the selector
+  // to a field form to provide the necessary context.
   def inputField[A](
     name: String, labelText: String, default: Option[A]
   )(

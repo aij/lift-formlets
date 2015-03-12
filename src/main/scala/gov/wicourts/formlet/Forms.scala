@@ -80,6 +80,18 @@ case class FormValidation[A,B](
 
   /** Returns a copy of this [[FormValidation]] with the transform set to the provided function */
   def setTransform(f: String => CssSel): FormValidation[A,B] = this.copy(transform = Some(f))
+
+  /** Lifts this `FormValidation` to one that takes two parameters */
+  def lift1To2V[C]: FormValidation[(FormValue[C], A),B] =
+    FormValidation({ case (_, a) => this.validation(a) }, this.transform)
+
+  /** Lifts this `FormValidation` to one that takes three parameters */
+  def lift1To3V[C,D]: FormValidation[(FormValue[C], FormValue[D], A),B] =
+    FormValidation({ case (_, _, a) => this.validation(a) }, this.transform)
+
+  /** Lifts this `FormValidation` to one that takes four parameters */
+  def lift1To4V[C,D,E]: FormValidation[(FormValue[C], FormValue[D], FormValue[E], A),B] =
+    FormValidation({ case (_, _, _, a) => this.validation(a) }, this.transform)
 }
 
 trait FormValidationInstances {
@@ -445,4 +457,16 @@ object FormHelpers {
     Form(env =>
       for (_ <- get[FormState])
       yield form)
+
+  /** Lifts a `FormValidation` with two parameters to one of three */
+  def lift2To3V[A,B,C](in: FormValidation[(FormValue[B],A),A]): FormValidation[(FormValue[B],FormValue[C],A),A] =
+    FormValidation({ case (b, _, a) => in.validation((b, a)) }, in.transform)
+
+  /** Lifts a `FormValidation` with two parameters to one of four */
+  def lift2To4V[A,B,C,D](in: FormValidation[(FormValue[B],A),A]): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+    FormValidation({ case (b, _, _, a) => in.validation((b, a)) }, in.transform)
+
+  /** Lifts a `FormValidation` with three parameters to one of four */
+  def lift3To4V[A,B,C,D](in: FormValidation[(FormValue[B],FormValue[C],A),A]): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+    FormValidation({ case (b, c, _, a) => in.validation((b, c, a)) }, in.transform)
 }
