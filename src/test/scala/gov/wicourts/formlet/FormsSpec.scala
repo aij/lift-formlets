@@ -71,15 +71,8 @@ class FormsSpec extends FormletSpec {
   }
 
   "Memoization" >> {
-    val randomResultForm: Form[String] =
-      Form(env =>
-        for {
-          _ <- get[FormState]
-        } yield BoundForm(
-          randomString(10).success,
-          None,
-          None,
-          cssSelZero))
+    def randomResultForm: Form[String] =
+      liftResult(BoundForm(randomString(10).success, FormMetadata.empty, cssSelZero))
 
     "should not work without calling .memoize" >> {
       val form = F.tuple2(randomResultForm, randomResultForm)

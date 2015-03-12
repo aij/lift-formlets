@@ -53,9 +53,8 @@ trait HtmlForms {
           else
             cssSelZero
         BoundForm(
-          setLabel(aa.result, aa.label),
-          aa.label,
-          aa.baseSelector,
+          setLabel(aa.result, aa.metadata.label),
+          aa.metadata,
           selector #> (aa.transform & errSel))
       }
     )
@@ -222,7 +221,7 @@ trait HtmlForms {
 
         val (selector, sel) = transform(formName, nonces, options)
 
-        BoundForm(liftStringV(formValue.success), None, selector.some, sel)
+        BoundForm(liftStringV(formValue.success), FormMetadata(None, selector.some), sel)
       }
     )
   }
@@ -265,8 +264,7 @@ trait HtmlForms {
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        None,
-        "input".some,
+        FormMetadata(None, "input".some),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
             val checkboxNs = <input type="checkbox" name={formName} value={serializer(formValue | default)} />
@@ -286,8 +284,7 @@ trait HtmlForms {
 
       BoundForm(
         result.success,
-        None,
-        "input".some,
+        FormMetadata(None, "input".some),
         "input [name]" #> formName & "input [type]" #> "file"
       )
     }
@@ -308,8 +305,7 @@ trait HtmlForms {
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        None,
-        baseSelector.some,
+        FormMetadata(None, baseSelector.some),
         nameSelector #> formName & valueSelector #> (userInput | serializer(default)))
     }
   }

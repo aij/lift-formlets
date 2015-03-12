@@ -67,7 +67,7 @@ class HtmlFormsSpec extends FormletSpec {
   "A field form" >> {
     "should be named by its label" >> {
       val (_, r) = field(".test", label("test label")).runEmpty
-      r.label must_== "test label".some
+      r.metadata.label must_== "test label".some
     }
 
     "should set error label to its label" >> {

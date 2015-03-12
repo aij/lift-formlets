@@ -141,22 +141,66 @@ object FormState {
 }
 
 /**
-  * The result of running a form
-  *
-  * @param result The form's value
   * @param label An optional label (for example, a form field's label)
   * @param baseSelector An optional CSS selector that can be used
   * to make further modifications to the form
+  */
+case class FormMetadata(
+  label: Option[String],
+  baseSelector: Option[String]
+) {
+  def merge(other: FormMetadata): FormMetadata = {
+    FormMetadata(
+      Some(List(this.label, other.label).flatten.mkString(" and ")).filterNot(_.isEmpty),
+      (this.baseSelector, other.baseSelector) match {
+        case (None, None) | (Some(_), Some(_)) => None
+        case (None, s@Some(_)) => s
+        case (s@Some(_), None) => s
+      })
+  }
+}
+
+object FormMetadata {
+  def empty: FormMetadata = FormMetadata(None, None)
+
+  val metadataLabel = Lens.lensu[FormMetadata,Option[String]](
+    (a, value) => a.copy(label = value),
+    _.label
+  )
+
+  val metadataBaseSelector = Lens.lensu[FormMetadata,Option[String]](
+    (a, value) => a.copy(baseSelector = value),
+    _.baseSelector
+  )
+
+  def formLabel[A]: Lens[BoundForm[A],Option[String]] =
+    BoundForm.formMetadata[A] >=> metadataLabel
+
+  def formBaseSelector[A]: Lens[BoundForm[A],Option[String]] =
+    BoundForm.formMetadata[A] >=> metadataBaseSelector
+}
+
+/**
+  * The result of running a form
+  *
+  * @param result The form's value
+  * @param metadata Used by other combinators to modify their behavior
   * @param transform The CSS selector transform to apply to the input template
   */
 case class BoundForm[A](
   result: ValidationNelE[A],
-  label: Option[String],
-  baseSelector: Option[String],
+  metadata: FormMetadata,
   transform: CssSel
 ) {
   /** Returns a list of error values or `Nil` if there are no error */
   def errors: List[NodeSeq] = result.fold(_.map(_.error).toList, _ => Nil)
+}
+
+object BoundForm {
+  def formMetadata[A] = Lens.lensu[BoundForm[A],FormMetadata](
+    (a, value) => a.copy(metadata = value),
+    _.metadata
+  )
 }
 
 /**
@@ -225,8 +269,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         ff <- f.runForm(env)
       } yield BoundForm(
         aa.result <*> ff.result,
-        Form.combineLabels(aa, ff),
-        Form.combineBaseSelectors(aa, ff),
+        aa.metadata merge ff.metadata,
         aa.transform & ff.transform))
 
   /**
@@ -241,15 +284,14 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       } yield {
         BoundForm(
           aa.result map f.validation,
-          aa.label,
-          aa.baseSelector,
+          aa.metadata,
           errTransform(aa, f))
       }).liftV
 
   private def errTransform[A,B,C](aa: BoundForm[A], f: FormValidation[B,C]): CssSel = {
     val e =
       for {
-        sel <- aa.baseSelector
+        sel <- aa.metadata.baseSelector
         t <- f.transform
       } yield aa.transform & t(sel)
     e getOrElse aa.transform
@@ -272,11 +314,14 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield f(aa))
 
+
   /** Modifies the result of this form to have the label provided */
-  def label(s: String): Form[A] = mapResult(_.copy(label = s.some))
+  def label(s: String): Form[A] =
+    mapResult(FormMetadata.formLabel.set(_, Some(s)))
 
   /** Modifies the result of this form to have the base selector provided */
-  def baseSelector(s: String): Form[A] = mapResult(_.copy(baseSelector = s.some))
+  def baseSelector(s: String): Form[A] =
+    mapResult(FormMetadata.formBaseSelector.set(_, Some(s)))
 
   private def foldV(a: ValidationNelE[ValidationNelE[A]]): ValidationNelE[A] =
     a.fold(_.failure[A], identity)
@@ -292,9 +337,10 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         if (List(bb, aa).exists(_.result.isFailure))
           aa.copy(transform = errTransform(aa, all))
         else {
-          val result = foldV(^(bb.result, aa.result)((b, a) =>
-            all.validation(FormValue(bb.label, b), a)))
-          BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
+          val result =
+            foldV(^(bb.result, aa.result)((b, a) =>
+              all.validation(FormValue(bb.metadata.label, b), a)))
+          BoundForm(result, aa.metadata, errTransform(aa, all))
         }
       })
 
@@ -314,9 +360,13 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         if (List(bb, cc, aa).exists(_.result.isFailure))
           aa.copy(transform = errTransform(aa, all))
         else {
-          val result = foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
-            all.validation(FormValue(bb.label, b), FormValue(cc.label, c), a)))
-          BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
+          val result =
+            foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
+              all.validation(
+                FormValue(bb.metadata.label, b),
+                FormValue(cc.metadata.label, c),
+                a)))
+          BoundForm(result, aa.metadata, errTransform(aa, all))
         }
       })
 
@@ -337,11 +387,16 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         if (List(bb, cc, dd, aa).exists(_.result.isFailure))
           aa.copy(transform = errTransform(aa, all))
         else {
-          val result = foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
-            all.validation(FormValue(bb.label, b), FormValue(cc.label, c), FormValue(dd.label, d), a)))
-            BoundForm(result, aa.label, aa.baseSelector, errTransform(aa, all))
-          }
-        })
+          val result =
+            foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
+              all.validation(
+                FormValue(bb.metadata.label, b),
+                FormValue(cc.metadata.label, c),
+                FormValue(dd.metadata.label, d),
+                a)))
+          BoundForm(result, aa.metadata, errTransform(aa, all))
+        }
+      })
 
   /**
     * Lifts a form returning a validation into a form that returns a value of
@@ -353,8 +408,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield BoundForm(
         aa.result.fold(_.failure[C], a => a: ValidationNelE[C]),
-        aa.label,
-        aa.baseSelector,
+        aa.metadata,
         aa.transform))
 
   /**
@@ -367,8 +421,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield BoundForm(
         aa.result.fold(_.failure[C], a => FormHelpers.liftNelStringV(a)),
-        aa.label,
-        aa.baseSelector,
+        aa.metadata,
         aa.transform))
 }
 
@@ -377,7 +430,7 @@ trait FormInstances {
     override def map[A, B](a: Form[A])(f: A => B): Form[B] = a map f
 
     override def point[A](a: => A): Form[A] =
-      FormHelpers.liftResult(BoundForm(a.success, None, None, cssSelZero))
+      FormHelpers.liftResult(BoundForm(a.success, FormMetadata.empty, cssSelZero))
 
     override def ap[A,B](fa: => Form[A])(f: => Form[A=>B]): Form[B] =
       fa ap f
@@ -387,18 +440,6 @@ trait FormInstances {
 object Form extends FormInstances {
   val F = Applicative[Form]
 
-  def combineLabels[A,B](a: BoundForm[A], b: BoundForm[B]): Option[String] = {
-    Some(List(a.label, b.label).flatten.mkString(" and ")).filterNot(_.isEmpty)
-  }
-
-  def combineBaseSelectors[A,B](a: BoundForm[A], b: BoundForm[B]): Option[String] = {
-    (a.baseSelector, b.baseSelector) match {
-      case (None, None) | (Some(_), Some(_)) => None
-      case (None, s@Some(_)) => s
-      case (s@Some(_), None) => s
-    }
-  }
-
   /** Returns a form that always fails with the provided message */
   def failing[A](message: String): Form[A] = {
     F.point(message.failure.toValidationNel).liftStringV
@@ -406,7 +447,7 @@ object Form extends FormInstances {
 
   /** Returns a form that applies the provided selector and label */
   def sel(sel: CssSel, label: Option[String] = None): Form[Unit] =
-    fresult { (_, _) => BoundForm(().success, label, None, sel) }
+    fresult { (_, _) => BoundForm(().success, FormMetadata(label, None), sel) }
 
   /** A convenience method for defining a form using a function */
   def fresult[A](f: (Env, FormState) => BoundForm[A]): Form[A] =
