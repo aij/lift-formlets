@@ -96,7 +96,7 @@ class HtmlFormsSpec extends FormletSpec {
   "A required form" >> {
     "should fail if form is empty" >> {
       val (_, r) = F.point(None).mapStringV(required).runEmpty
-      r.errors must_== List(Text(HtmlForms.requiredMessage))
+      r.errorsNs must_== List(Text(HtmlForms.requiredMessage))
     }
 
     "should succeed if form has a value" >> {
@@ -267,7 +267,7 @@ class HtmlFormsSpec extends FormletSpec {
         val fullName = ^(frankFirstName, lastName)(FullName.apply _)
         val (_, r) = fullName.run(env)
 
-        r.errors must_== List(Text("Only Frank is allowed"))
+        r.errorsNs must_== List(Text("Only Frank is allowed"))
       }
     }
 
@@ -322,7 +322,7 @@ class HtmlFormsSpec extends FormletSpec {
       "will return an error if only last name is set" >> {
         val env = Env.singleEnv(Map("lastName" -> "Johnson"))
         val (_, r) = fullName.run(env)
-        r.errors must_== List(Text("This field is required if the Last name field is set"))
+        r.errorsNs must_== List(Text("This field is required if the Last name field is set"))
       }
     }
   }

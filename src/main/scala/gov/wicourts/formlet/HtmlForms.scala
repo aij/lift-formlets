@@ -36,26 +36,33 @@ trait HtmlForms {
       a => liftStringV(required(a)),
       Some(s => (s + " [required]") #> "required"))
 
+  implicit val defaultErrorBinder = ErrorBinder((show, errors) =>
+    if (show)
+      // XXX This needs to be more flexible
+      ".errors *" #> (errors.map(n => <div>{n.error}</div>): NodeSeq)
+    else
+      cssSelZero
+  )
+
   /**
    * Binds the provided form to the provided selector and collects and
    * binds nested errors.
    */
-  def field[A](selector: String, contents: Form[A]): Form[A] =
+  def field[A](
+    selector: String, contents: Form[A]
+  )(
+    implicit errorBinder: ErrorBinder
+  ): Form[A] =
     Form(env =>
       for {
         s <- get[FormState]
         aa <- contents.runForm(env)
       } yield {
-        val errSel =
-          if (s.renderErrors_?)
-            // XXX This needs to be more flexible
-            ".errors *" #> (aa.errors.map(n => <div>{n}</div>): NodeSeq)
-          else
-            cssSelZero
+        val errContext = ErrorContext(selector, aa.binder, errorBinder)
         BoundForm(
           setLabel(aa.result, aa.metadata.label),
-          aa.metadata,
-          selector #> (aa.binder & errSel))
+          aa.metadata.setErrorContext(errContext),
+          selector #> (aa.binder & errorBinder.run(s.renderErrors_?, aa.errors)))
       }
     )
 
@@ -219,7 +226,11 @@ trait HtmlForms {
 
         val (selector, sel) = binder(formName, nonces, options)
 
-        BoundForm(liftStringV(formValue.success), FormMetadata(None, selector.some), sel)
+        BoundForm(
+          liftStringV(formValue.success),
+          FormMetadata(None, selector.some, None),
+          sel
+        )
       }
     )
   }
@@ -262,7 +273,7 @@ trait HtmlForms {
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        FormMetadata(None, "input".some),
+        FormMetadata(None, "input".some, None),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
             val checkboxNs = <input type="checkbox" name={formName} value={serializer(formValue | default)} />
@@ -282,7 +293,7 @@ trait HtmlForms {
 
       BoundForm(
         result.success,
-        FormMetadata(None, "input".some),
+        FormMetadata(None, "input".some, None),
         "input [name]" #> formName & "input [type]" #> "file"
       )
     }
@@ -303,7 +314,7 @@ trait HtmlForms {
       val formValue = userInput map converter getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        FormMetadata(None, baseSelector.some),
+        FormMetadata(None, baseSelector.some, None),
         nameSelector #> formName & valueSelector #> (userInput | serializer(default)))
     }
   }

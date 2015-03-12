@@ -24,7 +24,7 @@ class FormsSpec extends FormletSpec {
   "A failing form" >> {
     "should fail with the provided message" >> {
       val (_, r) = Form.failing("no way!").runEmpty
-      r.errors must_== List(Text("no way!"))
+      r.errorsNs must_== List(Text("no way!"))
     }
   }
 
@@ -61,12 +61,12 @@ class FormsSpec extends FormletSpec {
         (F.point("hi".some)
           ?? (StringValidation(_ => "nope".failure), StringValidation(_ => "definitely not".failure)))
           .runEmpty
-      r.errors must_== List(Text("nope"), Text("definitely not"))
+      r.errorsNs must_== List(Text("nope"), Text("definitely not"))
     }
     "should process validations in groups" >> {
       val (_, r) =
         (F.point("hi".some) ?? StringValidation(_ => "nope".failure) ?? StringValidation(_ => "definitely not".failure)).runEmpty
-      r.errors must_== List(Text("nope"))
+      r.errorsNs must_== List(Text("nope"))
     }
   }
 
