@@ -195,17 +195,15 @@ trait HtmlForms {
     }
 
     type SelectVar = (List[String], List[SelectableOptionWithNonce[A]])
-    val __var = new FormStateVar[SelectVar]
+    val __var = FormState.newFormStateVar[SelectVar]
 
     Form(env =>
       for {
-        v <- gets[FormState, Option[SelectVar]](__var.get)
         formName <- gets[FormState, String](_.contextName(name))
+        v <- __var.st
         selectOptions <- v.map(state[FormState,SelectVar]).getOrElse {
-          val selectState = noncedOptions
-          for {
-            _ <- modify[FormState](s => __var.set(s, selectState))
-          } yield selectState
+          val r = noncedOptions
+          (__var := r.some).map(_ => r)
         }
       } yield {
         val (defaultNonces, options) = selectOptions

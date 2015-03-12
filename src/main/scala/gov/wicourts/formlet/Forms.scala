@@ -138,13 +138,30 @@ case class FormState (
 object FormState {
   def apply(renderErrors: Boolean): FormState =
     FormState(Map[String,Any](), Nil, renderErrors)
+
+  private val formStateValues: FormState @> Map[String,Any] =
+    Lens.lensu[FormState,Map[String,Any]](
+      (a, v) => a.copy(values = v),
+      _.values
+    )
+
+  private def mapCastLens[K,V](k: K): Map[K,Any] @> Option[V] =
+    Lens.lensu[Map[K,Any],Option[V]](
+      (a, o) => o map (a.updated(k, _)) getOrElse (a - k),
+      _ get k map (_.asInstanceOf[V])
+    )
+
+  def newFormStateVar[T]: FormState @> Option[T] = {
+    val key = nextFuncName
+    formStateValues >=> mapCastLens[String,T](key)
+  }
 }
 
 /**
-  * @param label An optional label (for example, a form field's label)
-  * @param baseSelector An optional CSS selector that can be used
-  * to make further modifications to the form
-  */
+ * @param label An optional label (for example, a form field's label)
+ * @param baseSelector An optional CSS selector that can be used
+ * to make further modifications to the form
+ */
 case class FormMetadata(
   label: Option[String],
   baseSelector: Option[String]
@@ -163,20 +180,20 @@ case class FormMetadata(
 object FormMetadata {
   def empty: FormMetadata = FormMetadata(None, None)
 
-  val metadataLabel = Lens.lensu[FormMetadata,Option[String]](
+  private val metadataLabel = Lens.lensu[FormMetadata,Option[String]](
     (a, value) => a.copy(label = value),
     _.label
   )
 
-  val metadataBaseSelector = Lens.lensu[FormMetadata,Option[String]](
+  private val metadataBaseSelector = Lens.lensu[FormMetadata,Option[String]](
     (a, value) => a.copy(baseSelector = value),
     _.baseSelector
   )
 
-  def formLabel[A]: Lens[BoundForm[A],Option[String]] =
+  def formLabel[A]: BoundForm[A] @> Option[String] =
     BoundForm.formMetadata[A] >=> metadataLabel
 
-  def formBaseSelector[A]: Lens[BoundForm[A],Option[String]] =
+  def formBaseSelector[A]: BoundForm[A] @> Option[String] =
     BoundForm.formMetadata[A] >=> metadataBaseSelector
 }
 
@@ -197,10 +214,11 @@ case class BoundForm[A](
 }
 
 object BoundForm {
-  def formMetadata[A] = Lens.lensu[BoundForm[A],FormMetadata](
-    (a, value) => a.copy(metadata = value),
-    _.metadata
-  )
+  def formMetadata[A]: BoundForm[A] @> FormMetadata =
+    Lens.lensu[BoundForm[A],FormMetadata](
+      (a, value) => a.copy(metadata = value),
+      _.metadata
+    )
 }
 
 /**
@@ -233,13 +251,13 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     * as long as the same `FormState` is used.
     */
   def memoize: Form[A] = {
-    val __var = new FormStateVar[BoundForm[A]]
+    val __var = FormState.newFormStateVar[BoundForm[A]]
     Form(env =>
       for {
-        v <- gets[FormState, Option[BoundForm[A]]](__var.get)
+        v <- __var.st
         w <- v.map(state[FormState,BoundForm[A]]).getOrElse(for {
             aa <- this.runForm(env)
-            _ <- modify[FormState](s => __var.set(s, aa))
+            _ <- __var := aa.some
           } yield aa)
       } yield w)
   }
@@ -456,16 +474,6 @@ object Form extends FormInstances {
   /** Returns a copy of the provided validation with the label set to a new value */
   def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
     in.leftMap(_.map(_.copy(label = label)))
-}
-
-class FormStateVar[T] {
-  private val key = nextFuncName
-
-  def get(formState: FormState): Option[T] =
-    formState.values.get(key).map(_.asInstanceOf[T])
-
-  def set(formState: FormState, value: T): FormState =
-    formState.copy(values = formState.values + (key -> value))
 }
 
 object FormHelpers {
