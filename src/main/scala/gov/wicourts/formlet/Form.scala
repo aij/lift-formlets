@@ -161,7 +161,6 @@ case class ErrorBinder(run: (Boolean, List[FormError]) => CssSel)
 
 case class ErrorContext(
   selector: String,
-  origBinder: CssSel,
   errorBinder: ErrorBinder
 )
 

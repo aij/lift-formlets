@@ -58,7 +58,7 @@ trait HtmlForms {
         s <- get[FormState]
         aa <- contents.runForm(env)
       } yield {
-        val errContext = ErrorContext(selector, aa.binder, errorBinder)
+        val errContext = ErrorContext(selector, errorBinder)
         BoundForm(
           setLabel(aa.result, aa.metadata.label),
           aa.metadata.setErrorContext(errContext),
