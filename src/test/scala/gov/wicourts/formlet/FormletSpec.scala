@@ -7,7 +7,7 @@ import xml._
 
 trait FormletSpec extends Specification with XmlMatchers {
   def applyNs[A](form: Form[A], ns: NodeSeq): NodeSeq =
-    form.evalEmpty.transform.apply(ns).head
+    form.evalEmpty.binder.apply(ns).head
 
   def check[A](form: Form[A], ns: NodeSeq, expected: NodeSeq) = {
     applyNs(form, ns) must ==/ (expected)

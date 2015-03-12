@@ -54,7 +54,7 @@ object RequestBoundForm {
         })
 
         ns match {
-          case e: Elem => e.copy(child = processSubmission ++ a.transform.apply(e.child))
+          case e: Elem => e.copy(child = processSubmission ++ a.binder.apply(e.child))
           case n => n
         }
     }

@@ -55,7 +55,7 @@ trait HtmlForms {
         BoundForm(
           setLabel(aa.result, aa.metadata.label),
           aa.metadata,
-          selector #> (aa.transform & errSel))
+          selector #> (aa.binder & errSel))
       }
     )
 
@@ -75,7 +75,7 @@ trait HtmlForms {
   case class SelectableOptionWithNonce[+T](nonce: String, option: SelectableOption[T])
 
   /** Provides the UI binder for a [[multiSelect]]. */
-  type SelectTransformer[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
+  type SelectBinder[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
   private def asLabeledControl[A](
     typeValue: String,
@@ -171,7 +171,7 @@ trait HtmlForms {
 
   /**
    * Creates a form that selects from a list of values, bound using the provided
-   * [[SelectTransformer]]. In order to select a value, the form must be run
+   * [[SelectBinder]]. In order to select a value, the form must be run
    * using the the same [[FormState]] as that used to create the form initially.
    */
   def multiSelect[A](
@@ -179,7 +179,7 @@ trait HtmlForms {
     default: List[A],
     options: List[SelectableOption[A]]
   )(
-    transform: SelectTransformer[A]
+    binder: SelectBinder[A]
   ): Form[List[A]] = {
 
     def noncedOptions = {
@@ -217,7 +217,7 @@ trait HtmlForms {
           if (values.nonEmpty) values.map(_.nonce)
           else defaultNonces
 
-        val (selector, sel) = transform(formName, nonces, options)
+        val (selector, sel) = binder(formName, nonces, options)
 
         BoundForm(liftStringV(formValue.success), FormMetadata(None, selector.some), sel)
       }
@@ -246,9 +246,9 @@ trait HtmlForms {
     default: Option[A],
     options: List[SelectableOption[A]]
   )(
-    transform: SelectTransformer[A]
+    binder: SelectBinder[A]
   ): Form[Option[A]] =
-    multiSelect(name, default.toList, options)(transform).map(_.headOption)
+    multiSelect(name, default.toList, options)(binder).map(_.headOption)
 
   /** A `&lt;input type="checkbox"&gt;` form */
   def checkbox(

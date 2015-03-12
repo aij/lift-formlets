@@ -40,7 +40,7 @@ class FormsSpec extends FormletSpec {
     "should always apply client-side validation transform" >> {
       val alwaysFails = lift2V[String,String](
         (bn, a) => liftStringV("not this time".failure))
-          .setTransform(s => ((s + " [data-foo]") #> "foo"))
+          .setBinder(s => ((s + " [data-foo]") #> "foo"))
 
       val failingOtherForm = Form.failing[String]("no way!")
       val failingForm = Form
