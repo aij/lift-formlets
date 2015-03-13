@@ -29,29 +29,50 @@ class FormsSpec extends FormletSpec {
   }
 
   "Validations that depend on another field" >> {
-    "should not execute if the dependent field is not valid" >> {
-      val alwaysFails = lift2V[String,String]((bn, a) => liftStringV("not this time".failure))
+    "should not execute if the dependent fields are not valid" >> {
+      val alwaysFails = FormValidation[String,String](a => liftStringV("not this time".failure))
       val failingForm = Form.failing[String]("no way!")
-      val a = F.point[String]("ok").val2(failingForm)(alwaysFails)
+      val a = F.point[String]("ok")
 
-      a.evalEmpty.result must_== "ok".success
+      "with two parameters" >> {
+        val b = a.val2(failingForm)(alwaysFails.lift1To2V)
+        b.evalEmpty.result must_== "ok".success
+      }
+
+      "with three parameters" >> {
+        val b = a.val3(failingForm, failingForm)(alwaysFails.lift1To3V)
+        b.evalEmpty.result must_== "ok".success
+      }
+
+      "with four parameters" >> {
+        val b = a.val4(failingForm, failingForm, failingForm)(alwaysFails.lift1To4V)
+        b.evalEmpty.result must_== "ok".success
+      }
     }
 
     "should always apply client-side validation transform" >> {
-      val alwaysFails = lift2V[String,String](
-        (bn, a) => liftStringV("not this time".failure))
-          .setBinder(s => ((s + " [data-foo]") #> "foo"))
+      val alwaysFails = FormValidation[String,String](
+        a => liftStringV("not this time".failure),
+        Some(s => s"$s [data-foo]" #> "foo")
+      )
 
-      val failingOtherForm = Form.failing[String]("no way!")
-      val failingForm = Form
-        .failing[String]("no way!")
-        .baseSelector("input")
-        .val2(failingOtherForm)(alwaysFails)
+      val other = Form.failing[String]("no way!")
+      val failing = other.baseSelector("input")
 
       val in = <input />
       val out = <input data-foo="foo" />
 
-      check(failingForm, in, out)
+      "with two parameters" >> {
+        check(failing.val2(other)(alwaysFails.lift1To2V), in, out)
+      }
+
+      "with three parameters" >> {
+        check(failing.val3(other, other)(alwaysFails.lift1To3V), in, out)
+      }
+
+      "with four parameters" >> {
+        check(failing.val4(other, other, other)(alwaysFails.lift1To4V), in, out)
+      }
     }
   }
 
