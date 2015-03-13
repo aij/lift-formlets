@@ -157,7 +157,14 @@ object FormState {
   }
 }
 
-case class ErrorBinder(run: (Boolean, List[FormError]) => CssSel)
+case class ErrorBinder(run: (String, List[FormError]) => CssSel) {
+  def apply(state: FormState, selector: String, errors: List[FormError]): CssSel = {
+    if (state.renderErrors_? && errors.nonEmpty)
+      run(selector, errors)
+    else
+      cssSelZero
+  }
+}
 
 case class ErrorContext(
   selector: String,
@@ -316,21 +323,50 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   def mapV[B](f: FormValidation[A,B]): Form[B] =
     Form(env =>
       for {
+        s <- get[FormState]
         aa <- this.runForm(env)
       } yield {
+        val bb = foldV(aa.result map f.validation)
         BoundForm(
-          foldV(aa.result map f.validation),
+          bb,
           aa.metadata,
-          clientSideErrBinder(aa, f))
+          mappedErrors(s, f, aa, bb))
       })
 
-  private def clientSideErrBinder[A,B,C](aa: BoundForm[A], f: FormValidation[B,C]): CssSel = {
-    val e =
+  private def mappedErrors[B,C,D](
+    state: FormState,
+    f: FormValidation[C,D],
+    aa: BoundForm[A],
+    out: ValidationNelE[B]
+  ): CssSel = {
+    val l = List(clientSideErrBinder(aa, f), rebindErrors(state, aa, out)).flatten
+    l.fold(aa.binder)(_ & _)
+  }
+
+  private def clientSideErrBinder[B,C](
+    aa: BoundForm[A],
+    f: FormValidation[B,C]
+  ): Option[CssSel] = {
+    val r =
       for {
         sel <- aa.metadata.baseSelector
         t <- f.binder
-      } yield aa.binder & t(sel)
-    e getOrElse aa.binder
+      } yield {
+        t(sel)
+      }
+    ^(aa.metadata.errorContext, r)(_.selector #> _) orElse r
+  }
+
+  private def rebindErrors[B](
+    state: FormState,
+    in: BoundForm[A],
+    out: ValidationNelE[B]
+  ): Option[CssSel] = {
+    val errors = out.fold(_.toList, _ => Nil)
+    for {
+      c <- in.metadata.errorContext
+        if in.result.isSuccess && state.renderErrors_? && errors.nonEmpty
+    } yield c.errorBinder.apply(state, c.selector, errors)
   }
 
   /**
@@ -361,21 +397,27 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   private def foldV[B](a: ValidationNelE[ValidationNelE[B]]): ValidationNelE[B] =
     a.fold(_.failure[B], identity)
 
+  private def addClientSideValidation[B,C](aa: BoundForm[A], validation: FormValidation[B,C]): BoundForm[A] =
+    clientSideErrBinder(aa, validation)
+      .map(s => aa.copy(binder = aa.binder & s))
+      .getOrElse(aa)
+
   /** Validates this form using the result of another form as input. */
   def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
     Form(env =>
       for {
+        s <- get[FormState]
         bb <- b.runForm(env)
         aa <- this.runForm(env)
       } yield {
         val all = fs.toList.sequenceU.flatten(_._2)
         if (List(bb, aa).exists(_.result.isFailure))
-          aa.copy(binder = clientSideErrBinder(aa, all))
+          addClientSideValidation(aa, all)
         else {
           val result =
             foldV(^(bb.result, aa.result)((b, a) =>
               all.validation(FormValue(bb.metadata.label, b), a)))
-          BoundForm(result, aa.metadata, clientSideErrBinder(aa, all))
+          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
         }
       })
 
@@ -387,13 +429,14 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   ): Form[A] =
     Form(env =>
       for {
+        s <- get[FormState]
         bb <- b.runForm(env)
         cc <- c.runForm(env)
         aa <- this.runForm(env)
       } yield {
         val all = fs.toList.sequenceU.flatten(_._3)
         if (List(bb, cc, aa).exists(_.result.isFailure))
-          aa.copy(binder = clientSideErrBinder(aa, all))
+          addClientSideValidation(aa, all)
         else {
           val result =
             foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
@@ -401,7 +444,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
                 FormValue(bb.metadata.label, b),
                 FormValue(cc.metadata.label, c),
                 a)))
-          BoundForm(result, aa.metadata, clientSideErrBinder(aa, all))
+          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
         }
       })
 
@@ -413,6 +456,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   ): Form[A] =
     Form(env =>
       for {
+        s <- get[FormState]
         bb <- b.runForm(env)
         cc <- c.runForm(env)
         dd <- d.runForm(env)
@@ -420,7 +464,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       } yield {
         val all = fs.toList.sequenceU.flatten(_._4)
         if (List(bb, cc, dd, aa).exists(_.result.isFailure))
-          aa.copy(binder = clientSideErrBinder(aa, all))
+          addClientSideValidation(aa, all)
         else {
           val result =
             foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
@@ -429,7 +473,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
                 FormValue(cc.metadata.label, c),
                 FormValue(dd.metadata.label, d),
                 a)))
-          BoundForm(result, aa.metadata, clientSideErrBinder(aa, all))
+          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
         }
       })
 

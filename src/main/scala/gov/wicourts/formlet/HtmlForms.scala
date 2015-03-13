@@ -34,19 +34,10 @@ trait HtmlForms {
   def html5Required[A]: FormValidation[Option[A],A] =
     FormValidation(
       a => liftStringV(required(a)),
-      Some(s => (s + " [required]") #> "required"))
-
-  implicit val defaultErrorBinder = ErrorBinder((show, errors) =>
-    if (show)
-      // XXX This needs to be more flexible
-      ".errors *" #> (errors.map(n => <div>{n.error}</div>): NodeSeq)
-    else
-      cssSelZero
-  )
+      Some(s => s"$s [required]" #> "required"))
 
   /**
-   * Binds the provided form to the provided selector and collects and
-   * binds nested errors.
+   * Binds the provided form to the provided selector and binds nested errors.
    */
   def field[A](
     selector: String, contents: Form[A]
@@ -62,7 +53,7 @@ trait HtmlForms {
         BoundForm(
           setLabel(aa.result, aa.metadata.label),
           aa.metadata.setErrorContext(errContext),
-          selector #> (aa.binder & errorBinder.run(s.renderErrors_?, aa.errors)))
+          selector #> aa.binder & errorBinder.apply(s, selector, aa.errors))
       }
     )
 
@@ -338,6 +329,16 @@ trait HtmlForms {
       c(_).map(Some(_))
   }
 
+  object EmptyErrorBinder {
+    implicit val errorBinder = ErrorBinder((selector, errors) => cssSelZero)
+  }
+
+  object FoundationErrorBinder {
+    implicit val errorBinder = ErrorBinder((selector, errors) =>
+      s"$selector [class+]" #> "error" &
+        s"$selector *+" #> (errors.map(n => <small class="error">{n.error}</small>): NodeSeq)
+    )
+  }
 }
 
 trait LowPriorityHtmlFormsFunctions extends HtmlForms {

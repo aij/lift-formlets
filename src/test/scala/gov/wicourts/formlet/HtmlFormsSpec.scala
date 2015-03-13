@@ -16,6 +16,7 @@ class HtmlFormsSpec extends FormletSpec {
 
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
+  import HtmlForms.FoundationErrorBinder._
 
   val F = Form.F
 
@@ -80,9 +81,9 @@ class HtmlFormsSpec extends FormletSpec {
       r.result must_== FormError(Text(errorMessage), l.some).failure.toValidationNel
     }
 
-    "should bind its errors" >> {
-      val in = <div class="test"><div class="errors"></div></div>
-      val out = <div class="test"><div class="errors"><div>no way!</div></div></div>
+    "should bind nested errors" >> {
+      val in = <div class="test"><input type="text"/></div>
+      val out = <div class="test error"><input type="text"/><small class="error">no way!</small></div>
       check(field(".test", Form.failing("no way!")), in, out)
     }
 
@@ -90,6 +91,42 @@ class HtmlFormsSpec extends FormletSpec {
       val in = <input class="testClass"></input>
       val out = <input name="testName" class="testClass" value="v"></input>
       check(field(".testClass", input("testName", "v".some)), in, out)
+    }
+
+    "should be able to bind errors from validations applied to itself" >> {
+      val in =
+        <div class="test">
+          <input type="text" />
+        </div>
+      val out =
+        <div class="test error">
+          <input type="text" name="test" value="" foo="foo" />
+          <small class="error">no way!</small>
+        </div>
+
+      val other = F.point("hi!")
+
+      val f = field(".test", input[String]("test", None))
+      val v = FormValidation[Option[String],Option[String]](
+        a => liftStringV("no way!".failure),
+        Some(s => s"$s [foo]" #> "foo")
+      )
+
+      "with one parameter" >> {
+        check(f.mapV(v), in, out)
+      }
+
+      "with two parameters" >> {
+        check(f.val2(other)(v.lift1To2V), in, out)
+      }
+
+      "with three parameters" >> {
+        check(f.val3(other, other)(v.lift1To3V), in, out)
+      }
+
+      "with four parameters" >> {
+        check(f.val4(other, other, other)(v.lift1To4V), in, out)
+      }
     }
   }
 
