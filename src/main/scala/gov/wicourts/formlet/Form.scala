@@ -397,11 +397,6 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   private def foldV[B](a: ValidationNelE[ValidationNelE[B]]): ValidationNelE[B] =
     a.fold(_.failure[B], identity)
 
-  private def addClientSideValidation[B,C](aa: BoundForm[A], validation: FormValidation[B,C]): BoundForm[A] =
-    clientSideErrBinder(aa, validation)
-      .map(s => aa.copy(binder = aa.binder & s))
-      .getOrElse(aa)
-
   /** Validates this form using the result of another form as input. */
   def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
     Form(env =>
@@ -411,14 +406,14 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield {
         val all = fs.toList.sequenceU.flatten(_._2)
-        if (List(bb, aa).exists(_.result.isFailure))
-          addClientSideValidation(aa, all)
-        else {
-          val result =
+        val result =
+          if (List(bb, aa).exists(_.result.isFailure))
+            aa.result
+          else {
             foldV(^(bb.result, aa.result)((b, a) =>
               all.validation(FormValue(bb.metadata.label, b), a)))
-          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
-        }
+          }
+        BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
       })
 
   /** Validates this form using the result of two other forms as input. */
@@ -435,17 +430,17 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield {
         val all = fs.toList.sequenceU.flatten(_._3)
-        if (List(bb, cc, aa).exists(_.result.isFailure))
-          addClientSideValidation(aa, all)
-        else {
-          val result =
+        val result =
+          if (List(bb, cc, aa).exists(_.result.isFailure))
+            aa.result
+          else {
             foldV(^^(bb.result, cc.result, aa.result)((b, c, a) =>
               all.validation(
                 FormValue(bb.metadata.label, b),
                 FormValue(cc.metadata.label, c),
                 a)))
-          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
-        }
+          }
+        BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
       })
 
   /** Validates this form using the result of three other forms as input. */
@@ -463,18 +458,18 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa <- this.runForm(env)
       } yield {
         val all = fs.toList.sequenceU.flatten(_._4)
-        if (List(bb, cc, dd, aa).exists(_.result.isFailure))
-          addClientSideValidation(aa, all)
-        else {
-          val result =
+        val result =
+          if (List(bb, cc, dd, aa).exists(_.result.isFailure))
+            aa.result
+          else {
             foldV(^^^(bb.result, cc.result, dd.result, aa.result)((b, c, d, a) =>
               all.validation(
                 FormValue(bb.metadata.label, b),
                 FormValue(cc.metadata.label, c),
                 FormValue(dd.metadata.label, d),
                 a)))
-          BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
-        }
+          }
+        BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
       })
 
   /**
