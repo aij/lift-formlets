@@ -28,21 +28,19 @@ object Form1 {
 
 // Template: src/main/webapp/form2.html
 object Form2 {
-  import Extras._
-
   case class FullName(firstName: String, middleName: Option[String], lastName: String) {
     def fullName: String =
       List(firstName.some, middleName, lastName.some).flatten.mkString(" ")
   }
 
-  // See Extras for an explanation of the inputField combinator
+  // See below for an explanation of the inputField combinator
   //
   // There are now three input fields. First name and last name are required.
   // Middle initial is optional.
   //
   // There is a bit of implicit magic to add a .required enrichment to any
   // Option[A] form, but behind the scenes it uses the .mapStringV method just
-  // like the second validation does. One important note about .mapString or
+  // like the second validation does. One important note about .mapStringV or
   // its more general cousin .mapV is that it can change the type of the form.
   // First name came in as Form[Option[String]], but left as a Form[String].
   //
@@ -77,21 +75,13 @@ object Form2 {
       inputField("lastName", "Last name", none[String]).required
     )(FullName.apply _)
 
-  private val binder = RequestBoundForm.newBinder(form) { a =>
-    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
-  }
-
-  def render = ".form2" #> binder
-}
-
-object Extras {
   // An example combinator that composes several forms (four to be exact).
   // labelText is bound to a <label>. An <input> is bound with the provided
   // name and then the for attribute on the <label> and the id attribute on the
   // <input> is also set to this name. Finally, .<name> is used as the selector
   // to a field form to provide the necessary context.
   //
-  // It's important to note that none of the forms listed here is in any way
+  // It's important to note that none of the forms used here is in any way
   // "magical". None of the them are particularly involved and all could have
   // been defined as part of the application just like inputField.
   def inputField[A](
@@ -104,4 +94,32 @@ object Extras {
 
     field("." + name, labeledField)
   }
+
+  private val binder = RequestBoundForm.newBinder(form) { a =>
+    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
+  }
+
+  def render = ".form2" #> binder
+}
+
+// Template: src/main/webapp/form3.html
+object Form3 {
+  import Extras._
+
+  case class FullName(firstName: String, middleName: Option[String], lastName: String) {
+    def fullName: String =
+      List(firstName.some, middleName, lastName.some).flatten.mkString(" ")
+  }
+
+  private def form: Form[FullName] = Form.F.point(FullName("Jack", None, "Johnson"))
+
+  private val binder = RequestBoundForm.newBinder(form) { a =>
+    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
+  }
+
+  def render = ".form3" #> binder
+}
+
+
+object Extras {
 }

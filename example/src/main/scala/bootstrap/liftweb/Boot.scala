@@ -25,6 +25,7 @@ class Boot {
       Menu.i("Home") / "index",
       Menu.i("Form 1") / "form1",
       Menu.i("Form 2") / "form2",
+      Menu.i("Form 3") / "form3",
 
       // more complex because this menu allows anything in the
       // /static path to be visible

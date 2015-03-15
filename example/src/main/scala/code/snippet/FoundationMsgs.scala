@@ -2,7 +2,7 @@ package code.snippet
 
 import xml._
 
-/** A quick hack to style `Msgs` using Foundation alert boxes */
+/** A quick hack to style `Msgs` using Foundation (static) alert boxes */
 object FoundationMsgs {
   def render: NodeSeq =
     <div data-lift="Msgs">

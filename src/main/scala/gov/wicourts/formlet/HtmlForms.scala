@@ -22,7 +22,7 @@ trait HtmlForms {
   /** Converts an input `String` to a value of type `A` */
   type Converter[A] = String => Validation[String,A]
 
-  val requiredMessage = "This field is required"
+  val requiredMessage = "Please enter a value"
 
   /** Lifts an optional value of type `A` to a validation of type `A` */
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
@@ -321,6 +321,16 @@ trait HtmlForms {
 
     implicit val booleanConverter: Converter[Boolean] = s =>
       asBoolean(s).openOr(false).success
+
+    implicit val intConverter: Converter[Int] = s =>
+      s.parseInt.leftMap(_ => "Please enter a whole number")
+
+    implicit val intSerializer: Serializer[Int] = _.toString
+
+    implicit val longConverter: Converter[Long] = s =>
+      s.parseLong.leftMap(_ => "Please enter a whole number")
+
+    implicit val longSerializer: Serializer[Long] = _.toString
 
     implicit def optionSerializer[A](implicit s: Serializer[A]): Serializer[Option[A]] =
       _.map(s(_)).getOrElse("")

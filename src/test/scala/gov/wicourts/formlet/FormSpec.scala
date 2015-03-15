@@ -9,7 +9,7 @@ import Scalaz._
 
 import net.liftweb.util.Helpers.{^ => _, _}
 
-class FormsSpec extends FormletSpec {
+class FormSpec extends FormletSpec {
   import FormHelpers._
 
   val F = Form.F
