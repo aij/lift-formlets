@@ -10,8 +10,9 @@ import gov.wicourts.formlet.snippet.RequestBoundForm
 import scalaz._
 import Scalaz._
 
-import net.liftweb.util.Helpers._
+import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.S
+import net.liftweb.http.SHtml.SelectableOption
 
 // Template: src/main/webapp/form1.html
 object Form1 {
@@ -75,6 +76,12 @@ object Form2 {
       inputField("lastName", "Last name", none[String]).required
     )(FullName.apply _)
 
+  private val binder = RequestBoundForm.newBinder(form) { a =>
+    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
+  }
+
+  def render = ".form2" #> binder
+
   // An example combinator that composes several forms (four to be exact).
   // labelText is bound to a <label>. An <input> is bound with the provided
   // name and then the for attribute on the <label> and the id attribute on the
@@ -92,34 +99,91 @@ object Form2 {
     val attrs = "label [for]" #> name & "input [id]" #> name
     val labeledField = label(labelText) *> input(name, default) <* sel(attrs)
 
-    field("." + name, labeledField)
+    field(s".$name", labeledField)
   }
-
-  private val binder = RequestBoundForm.newBinder(form) { a =>
-    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
-  }
-
-  def render = ".form2" #> binder
 }
 
 // Template: src/main/webapp/form3.html
 object Form3 {
-  import Extras._
-
+  // As above
   case class FullName(firstName: String, middleName: Option[String], lastName: String) {
     def fullName: String =
       List(firstName.some, middleName, lastName.some).flatten.mkString(" ")
   }
 
-  private def form: Form[FullName] = Form.F.point(FullName("Jack", None, "Johnson"))
+  case class Registration(
+    guest: FullName,
+    plusone: FullName,
+    favoriteColors: List[String],
+    comments: Option[String],
+    mailingList: Boolean
+  )
+
+  private val fullNameForm =
+    ^^(
+      inputField("firstName", "First name", none[String]).required,
+      inputField("middleInitial", "Middle initial", none[String]),
+      inputField("lastName", "Last name", none[String]).required
+    )(FullName.apply _)
+
+  val choices = List(
+    "Red",
+    "Blue",
+    "Yellow",
+    "Purple",
+    "Orange",
+    "Green").map(s => SelectableOption(s, s))
+
+  // Various ways of rendering a list of choices. Behind the scenes these all
+  // use the multiSelect form with different UI binders, which you could also
+  // supply yourself. The duplication between field and the wrapped form could
+  // be addressed in a similar way to inputField.
+  private val colors =
+    ^^^(
+      field(".selectSelect", selectSelect("selectSelect", none[String], choices)),
+      field(".radioSelect", radioSelect("radioSelect", none[String], choices)),
+      field(".selectMultiSelect", selectMultiSelect("selectMultiSelect", Nil, choices)),
+      field(".checkboxMultiSelect", checkboxMultiSelect("checkboxMultiSelect", Nil, choices))
+    )((a, b, c, d) => List(a.toList, b.toList, c, d).flatten.distinct.sorted)
+
+  private def form: Form[Registration] =
+    ^^^^(
+      group("guest", fullNameForm),
+      group("plusone", fullNameForm),
+      colors,
+      field(".comments", textarea("comments", none[String])),
+      field(".mailingList", checkbox("mailingList", true))
+    )(Registration.apply _)
 
   private val binder = RequestBoundForm.newBinder(form) { a =>
-    S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
+    // Just for demo purposes!
+    S.notice(
+      <div>
+        Hi there {a.guest.fullName}! Thanks for registering.
+        <ul>
+          <li>Name: {a.guest.fullName}</li>
+          <li>Plus one name: {a.plusone.fullName}</li>
+          <li>Favorite colors: {a.favoriteColors.mkString(", ")}</li>
+          <li>Comments: {a.comments.getOrElse("")}</li>
+          <li>Mailing list: {a.mailingList}</li>
+        </ul>
+      </div>
+    )
   }
 
   def render = ".form3" #> binder
-}
 
+  // Very similar to the inputField combinator from Form2, but it goes one step
+  // further and generates the <label> element directly vs. binding to an
+  // existing one.
+  def inputField[A](
+    name: String, labelText: String, default: Option[A]
+  )(
+    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+  ): Form[Option[A]] = {
+    val labeledField = input(name, default) <* sel("input [id]" #> name)
 
-object Extras {
+    field(s".$name", labeledField).mapBinder(
+      _ & s".$name -*" #> <label for={name}>{labelText}</label>)
+  }
 }

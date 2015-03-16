@@ -5,18 +5,53 @@
     <h2>A third form!</h2>
     <div data-lift="FoundationMsgs?showAll=true"></div>
     <form data-lift="Form3" class="form3" method="POST">
-      <div class="firstName">
-        <label>First name placeholder</label>
-        <input type="text">
+      <fieldset class="guest">
+        <legend>Your name</legend>
+        <div class="row">
+          <div class="firstName large-4 columns"><input type="text"></div>
+          <div class="middleInitial large-3 columns"><input type="text"></div>
+          <div class="lastName large-5 columns"><input type="text"></div>
+        </div>
+      </fieldset>
+      <fieldset class="plusone">
+        <legend>Your "plus one"</legend>
+        <div class="row">
+          <div class="firstName large-4 columns"><input type="text"></div>
+          <div class="middleInitial large-3 columns"><input type="text"></div>
+          <div class="lastName large-5 columns"><input type="text"></div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Favorite colors</legend>
+        <div class="row">
+          <div class="selectSelect large-3 columns">
+            <label for="selectSelect">Select</label>
+            <select id="selectSelect"></select>
+          </div>
+          <div class="large-3 columns">
+            <label>Radio buttons</label>
+            <div class="radioSelect">
+              <label><input type="radio" /></label>
+            </div>
+          </div>
+          <div class="selectMultiSelect large-3 columns">
+            <label for="selectMultiSelect">Select with multiple</label>
+            <select id="selectMultiSelect"></select>
+          </div>
+          <div class="large-3 columns">
+            <label>Checkboxes</label>
+            <div class="checkboxMultiSelect">
+              <label><input type="checkbox" /></label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      </fieldset>
+      <div class="comments">
+        <label for="comments">Comments</label>
+        <textarea class="comments" id="comments"></textarea>
       </div>
-      <div class="middleInitial">
-        <label>Middle initial placeholder</label>
-        <input type="text">
-      </div>
-      <div class="lastName">
-        <label>lastName name placeholder</label>
-        <input type="text">
-      </div>
+      <div class="mailingList"><label><input type="checkbox"> Would you like to sign up for our mailing list?</label></div>
       <input type="submit" value="Submit" class="button success">
     </form>
   </div>
