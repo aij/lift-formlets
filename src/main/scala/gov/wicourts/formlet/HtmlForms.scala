@@ -88,8 +88,7 @@ trait HtmlForms {
   type SelectBinder[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
   private def asLabeledControl[A](
-    typeValue: String,
-    selectedAttr: String
+    typeValue: String
   )(
     name: String, selectedNonces: List[String], noncedOptions: List[SelectableOptionWithNonce[A]]
   ): (String, CssSel) = {
@@ -100,7 +99,7 @@ trait HtmlForms {
         val controlBinder =
           s"type=$typeValue [name]" #> name &
           s"type=$typeValue [value]" #> nonce &
-          s"type=$typeValue [$selectedAttr]" #> Some(selectedAttr).filter(_ => selectedNonces.contains(nonce))
+          s"type=$typeValue [checked]" #> Some("checked").filter(_ => selectedNonces.contains(nonce))
 
         val (idAttribute, controlBinderWithAttributes) =
           option.attrs.foldLeft((None: Option[String], controlBinder)) { (binderSoFar, attribute) =>
@@ -177,7 +176,7 @@ trait HtmlForms {
     default: List[A],
     options: List[SelectableOption[A]]
   ): Form[List[A]] =
-    multiSelect(name, default, options)(asLabeledControl("checkbox", "checked"))
+    multiSelect(name, default, options)(asLabeledControl("checkbox"))
 
   /**
    * Creates a form that selects from a list of values, bound using the provided
@@ -252,7 +251,7 @@ trait HtmlForms {
     default: Option[A],
     options: List[SelectableOption[A]]
   ): Form[Option[A]] =
-    select(name, default, options)(asLabeledControl("radio", "selected"))
+    select(name, default, options)(asLabeledControl("radio"))
 
   /** A [[multiSelect]] that selects a single value */
   def select[A](
