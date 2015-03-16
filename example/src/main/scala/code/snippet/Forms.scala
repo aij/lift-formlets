@@ -88,9 +88,10 @@ object Form2 {
   // <input> is also set to this name. Finally, .<name> is used as the selector
   // to a field form to provide the necessary context.
   //
-  // It's important to note that none of the forms used here is in any way
-  // "magical". None of the them are particularly involved and all could have
-  // been defined as part of the application just like inputField.
+  // See http://simply.liftweb.net/index-7.10.html for more information on the
+  // #> operator. Running a form produces a binding function (a CssSel) that is
+  // applied to an existing HTML template. Binding functions are composed when
+  // forms are composed.
   def inputField[A](
     name: String, labelText: String, default: Option[A]
   )(
