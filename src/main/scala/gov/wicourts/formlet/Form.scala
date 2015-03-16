@@ -151,10 +151,8 @@ object FormState {
       _ get k map (_.asInstanceOf[V])
     )
 
-  def newFormStateVar[T]: FormState @> Option[T] = {
-    val key = nextFuncName
+  def newFormStateVar[T](key: String = nextFuncName): FormState @> Option[T] =
     formStateValues >=> mapCastLens[String,T](key)
-  }
 }
 
 case class ErrorBinder(run: (String, List[FormError]) => CssSel) {
@@ -276,7 +274,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     * as long as the same `FormState` is used.
     */
   def memoize: Form[A] = {
-    val __var = FormState.newFormStateVar[BoundForm[A]]
+    val __var = FormState.newFormStateVar[BoundForm[A]]()
     Form(env =>
       for {
         v <- __var.st
