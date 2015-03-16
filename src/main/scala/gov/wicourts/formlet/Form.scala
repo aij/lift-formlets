@@ -196,6 +196,9 @@ case class FormMetadata(
 
   def setErrorContext(e: ErrorContext): FormMetadata =
     this.copy(errorContext = e.some)
+
+  def clearErrorContext: FormMetadata =
+    this.copy(errorContext = none)
 }
 
 object FormMetadata {
@@ -378,11 +381,16 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   def ??(fs: FormValidation[A,A]*): Form[A] =
     this.mapV(fs.toList.sequenceU.flatten(identity))
 
-  private def mapResult[B](f: BoundForm[A] => BoundForm[B]): Form[B] =
+  /** Transforms the result of this form */
+  def mapResult[B](f: BoundForm[A] => BoundForm[B]): Form[B] =
     Form(env =>
       for {
         aa <- this.runForm(env)
       } yield f(aa))
+
+  /** Transforms the binder of this form */
+  def mapBinder(f: CssSel => CssSel): Form[A] =
+    mapResult(r => r.copy(binder = f(r.binder)))
 
   /** Modifies the result of this form to have the label provided */
   def label(s: String): Form[A] =

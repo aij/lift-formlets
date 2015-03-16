@@ -37,6 +37,18 @@ trait HtmlForms {
       Some(s => s"$s [required]" #> "required"))
 
   /**
+   * Groups a form under a class selector of `className` with a context of the
+   * same.
+   */
+  def group[A](className: String, contents: Form[A]): Form[A] =
+    contents.mapResult(aa =>
+      BoundForm(
+        aa.result,
+        aa.metadata.clearErrorContext,
+        s".$className" #> aa.binder)
+    ).context(className)
+
+  /**
    * Binds the provided form to the provided selector and binds nested errors.
    */
   def field[A](
@@ -258,6 +270,13 @@ trait HtmlForms {
   )(
     implicit serializer: Serializer[Boolean], converter: Converter[Boolean]
   ): Form[Boolean] = {
+    def checked(in: Boolean) = {
+      if (in)
+        new UnprefixedAttribute("checked", "checked", Null)
+      else
+        Null
+    }
+
     fresult { (env, state) =>
       val formName = state.contextName(name)
       val userInput = Env.single(env, formName)
@@ -267,9 +286,9 @@ trait HtmlForms {
         FormMetadata(None, "input".some, None),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
-            val checkboxNs = <input type="checkbox" name={formName} value={serializer(formValue | default)} />
+            val checkboxNs = <input type="checkbox" name={formName} value="true" />
 
-            element.attributes.foldLeft(checkboxNs)(_ % _) ++
+            element.attributes.foldLeft(checkboxNs)(_ % _) % checked(formValue | default) ++
             <input type="hidden" name={formName} value="false" />
           }
         }})

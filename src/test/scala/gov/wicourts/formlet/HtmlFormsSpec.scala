@@ -130,6 +130,26 @@ class HtmlFormsSpec extends FormletSpec {
     }
   }
 
+  "A group form" >> {
+    "should apply CSS selector context and form name context" >> {
+      val in =
+        <div>
+          <div class="name1"><input type="text"/></div>
+          <div class="name2"><input type="text"/></div>
+        </div>
+      val out =
+        <div>
+          <div class="name1"><input value="" type="text" name="name1_fullName"/></div>
+          <div class="name2"><input value="" type="text" name="name2_fullName"/></div>
+        </div>
+
+      val fullName = input[String]("fullName", None)
+      val form = F.tuple2(group("name1", fullName), group("name2", fullName))
+
+      check(form, in, out)
+    }
+  }
+
   "A required form" >> {
     "should fail if form is empty" >> {
       val (_, r) = F.point(None).mapStringV(required).runEmpty
@@ -223,7 +243,7 @@ class HtmlFormsSpec extends FormletSpec {
       val in = <div><input></input></div>
       val out =
         <div>
-          <input type="checkbox" name="test" value="true"/>
+          <input type="checkbox" name="test" value="true" checked="checked"/>
           <input type="hidden" name="test" value="false"/>
         </div>
 
@@ -238,7 +258,7 @@ class HtmlFormsSpec extends FormletSpec {
           <input type="hidden" name="tc_test" value="false"/>
         </div>
 
-      check(checkbox("test", true).context("tc"), in, out)
+      check(checkbox("test", false).context("tc"), in, out)
     }
   }
 
