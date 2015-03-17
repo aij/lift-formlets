@@ -173,6 +173,8 @@ object Form3 {
 
   def render = ".form3" #> binder
 
+  // A few combinators for input forms identified by CSS class name.
+
   // Very similar to the inputField combinator from Form2, but it goes one step
   // further and generates the <label> element directly vs. binding to an
   // existing one.
