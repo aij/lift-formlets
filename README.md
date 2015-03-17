@@ -33,11 +33,6 @@ with Formaggio and the details are ultimately very different, but it was still
 incredibly helpful to find another Formlet library that also used Scala and
 Scalaz.
 
-## License
-
-lift-formlets is provided under the terms of the MIT License. No warranties
-are made, express or implied.  See the `LICENSE` file in this same directory.
-
 # Author/Contributors
 
 lift-formlets is copyright [Wisconsin Court System](http://wicourts.gov/), and was

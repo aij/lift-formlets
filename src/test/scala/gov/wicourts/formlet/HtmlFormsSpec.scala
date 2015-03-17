@@ -175,7 +175,7 @@ class HtmlFormsSpec extends FormletSpec {
         options: List[SelectableOptionWithNonce[A]]
       ) = ("div", "div" #> options.map(_.nonce).mkString(","))
 
-      val sel = select("test", None, options)(transform _).required
+      val sel = choice("test", None, options)(transform _).required
 
       val (s, r) = sel.runEmpty
       val nonces = r.binder.apply(<div></div>).toString.split(",")
@@ -185,7 +185,7 @@ class HtmlFormsSpec extends FormletSpec {
     }
 
     "should support form context" >> {
-      val sel = selectSelect("test", None, options).required.context("tc")
+      val sel = select("test", None, options).required.context("tc")
 
       val ns = applyNs(sel, <select></select>)
 
@@ -195,7 +195,7 @@ class HtmlFormsSpec extends FormletSpec {
     // A few basic smoke tests
 
     "should be able to render to a <select>" >> {
-      val sel = selectSelect("test", None, options).required
+      val sel = select("test", None, options).required
 
       val ns = applyNs(sel, <select></select>)
 
@@ -203,7 +203,7 @@ class HtmlFormsSpec extends FormletSpec {
     }
 
     "should be able to render to a <select multiple>" >> {
-      val sel = selectMultiSelect("test", Nil, options)
+      val sel = multiSelect("test", Nil, options)
 
       val ns = applyNs(sel, <select></select>)
 
@@ -217,7 +217,7 @@ class HtmlFormsSpec extends FormletSpec {
           <label><input type="radio" /></label>
         </div>
 
-      val form = radioSelect("test", None, options).required
+      val form = select("test", None, options, asRadioButtons = true).required
       val ns = applyNs(form, input)
 
       (ns \\ "label").length must_== 3
@@ -230,7 +230,7 @@ class HtmlFormsSpec extends FormletSpec {
           <label><input type="checkbox" /></label>
         </div>
 
-      val form = checkboxMultiSelect("test", Nil, options)
+      val form = multiSelect("test", Nil, options, asCheckboxes = true)
       val ns = applyNs(form, input)
 
       (ns \\ "label").length must_== 3

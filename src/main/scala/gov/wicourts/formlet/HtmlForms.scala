@@ -84,7 +84,7 @@ trait HtmlForms {
   /** A `SelectableOption` that can be referenced by the provided opaque value. */
   case class SelectableOptionWithNonce[+T](nonce: String, option: SelectableOption[T])
 
-  /** Provides the UI binder for a [[multiSelect]]. */
+  /** Provides the UI binder for a [[choices]] form. */
   type SelectBinder[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
   private def asLabeledControl[A](
@@ -162,28 +162,28 @@ trait HtmlForms {
     ("select", multipleSel & nameSel & "select *" #> <xml:group>{optionsNs}</xml:group>)
   }
 
-  /** A [[multiSelect]] rendered as a `&lt;select multiple&gt;` */
-  def selectMultiSelect[A](
+  /** A list of choices rendered either as a `&lt;select multiple&gt;` or check boxes */
+  def multiSelect[A](
     name: String,
     default: List[A],
-    options: List[SelectableOption[A]]
+    options: List[SelectableOption[A]],
+    asCheckboxes: Boolean = false
   ): Form[List[A]] =
-    multiSelect(name, default, options)(asSelect(true))
-
-  /** A [[multiSelect]] rendered using `&lt;input type="checkbox"&gt;` */
-  def checkboxMultiSelect[A](
-    name: String,
-    default: List[A],
-    options: List[SelectableOption[A]]
-  ): Form[List[A]] =
-    multiSelect(name, default, options)(asLabeledControl("checkbox"))
+    choices(
+      name, default, options
+    )(
+      if (asCheckboxes)
+        asLabeledControl("checkbox")
+      else
+        asSelect(true)
+    )
 
   /**
    * Creates a form that selects from a list of values, bound using the provided
    * [[SelectBinder]]. In order to select a value, the form must be run
    * using the the same [[FormState]] as that used to create the form initially.
    */
-  def multiSelect[A](
+  def choices[A](
     name: String,
     default: List[A],
     options: List[SelectableOption[A]]
@@ -237,31 +237,31 @@ trait HtmlForms {
     )
   }
 
-  /** A [[select]] rendered as a `&lt;select&gt;` */
-  def selectSelect[A](
-    name: String,
-    default: Option[A],
-    options: List[SelectableOption[A]]
-  ): Form[Option[A]] =
-    select(name, default, options)(asSelect(false))
-
-  /** A [[select]] rendered using `&lt;input type="radio"&gt;` */
-  def radioSelect[A](
-    name: String,
-    default: Option[A],
-    options: List[SelectableOption[A]]
-  ): Form[Option[A]] =
-    select(name, default, options)(asLabeledControl("radio"))
-
-  /** A [[multiSelect]] that selects a single value */
+  /** A list of choices rendered either as a `&lt;select&gt;` or radio buttons */
   def select[A](
+    name: String,
+    default: Option[A],
+    options: List[SelectableOption[A]],
+    asRadioButtons: Boolean = false
+  ): Form[Option[A]] =
+    choice(
+      name, default, options
+    )(
+      if (asRadioButtons)
+        asLabeledControl("radio")
+      else
+        asSelect(false)
+    )
+
+  /** A [[choices]] form that selects a single value */
+  def choice[A](
     name: String,
     default: Option[A],
     options: List[SelectableOption[A]]
   )(
     binder: SelectBinder[A]
   ): Form[Option[A]] =
-    multiSelect(name, default.toList, options)(binder).map(_.headOption)
+    choices(name, default.toList, options)(binder).map(_.headOption)
 
   /** A `&lt;input type="checkbox"&gt;` form */
   def checkbox(

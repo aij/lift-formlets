@@ -136,15 +136,14 @@ object Form3 {
     "Green").map(s => SelectableOption(s, s))
 
   // Various ways of rendering a list of choices. Behind the scenes these all
-  // use the multiSelect form with different UI binders, which you could also
-  // supply yourself. The duplication between field and the wrapped form could
-  // be addressed in a similar way to inputField.
+  // use the choices form with different UI binders, which you could also
+  // supply yourself.
   private val colors =
     ^^^(
-      field(".selectSelect", selectSelect("selectSelect", none[String], choices)),
-      field(".radioSelect", radioSelect("radioSelect", none[String], choices)),
-      field(".selectMultiSelect", selectMultiSelect("selectMultiSelect", Nil, choices)),
-      field(".checkboxMultiSelect", checkboxMultiSelect("checkboxMultiSelect", Nil, choices))
+      selectField("selectSelect", none[String], choices),
+      selectField("radioSelect", none[String], choices, asRadioButtons = true),
+      multiSelectField("selectMultiSelect", Nil, choices),
+      multiSelectField("checkboxMultiSelect", Nil, choices, asCheckboxes = true)
     )((a, b, c, d) => List(a.toList, b.toList, c, d).flatten.distinct.sorted)
 
   private def form: Form[Registration] =
@@ -186,5 +185,27 @@ object Form3 {
 
     field(s".$name", labeledField).mapBinder(
       _ & s".$name -*" #> <label for={name}>{labelText}</label>)
+  }
+
+  def selectField[A](
+    name: String,
+    default: Option[A],
+    options: List[SelectableOption[A]],
+    asRadioButtons: Boolean = false
+  )(
+    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+  ): Form[Option[A]] = {
+    field(s".$name", select(name, default, options, asRadioButtons))
+  }
+
+  def multiSelectField[A](
+    name: String,
+    default: List[A],
+    options: List[SelectableOption[A]],
+    asCheckboxes: Boolean = false
+  )(
+    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+  ): Form[List[A]] = {
+    field(s".$name", multiSelect(name, default, options, asCheckboxes))
   }
 }
