@@ -85,7 +85,7 @@ trait HtmlForms {
   case class SelectableOptionWithNonce[+T](nonce: String, option: SelectableOption[T])
 
   /** Provides the UI binder for a [[choices]] form. */
-  type SelectBinder[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
+  type ChoiceBinder[A] = (String, List[String], List[SelectableOptionWithNonce[A]]) => (String, CssSel)
 
   private def asLabeledControl[A](
     typeValue: String
@@ -180,7 +180,7 @@ trait HtmlForms {
 
   /**
    * Creates a form that selects from a list of values, bound using the provided
-   * [[SelectBinder]]. In order to select a value, the form must be run
+   * [[ChoiceBinder]]. In order to select a value, the form must be run
    * using the the same [[FormState]] as that used to create the form initially.
    */
   def choices[A](
@@ -188,7 +188,7 @@ trait HtmlForms {
     default: List[A],
     options: List[SelectableOption[A]]
   )(
-    binder: SelectBinder[A]
+    binder: ChoiceBinder[A]
   ): Form[List[A]] = {
 
     def noncedOptions = {
@@ -259,7 +259,7 @@ trait HtmlForms {
     default: Option[A],
     options: List[SelectableOption[A]]
   )(
-    binder: SelectBinder[A]
+    binder: ChoiceBinder[A]
   ): Form[Option[A]] =
     choices(name, default.toList, options)(binder).map(_.headOption)
 

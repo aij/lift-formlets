@@ -348,13 +348,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     aa: BoundForm[A],
     f: FormValidation[B,C]
   ): Option[CssSel] = {
-    val r =
-      for {
-        sel <- aa.metadata.baseSelector
-        t <- f.binder
-      } yield {
-        t(sel)
-      }
+    val r = ^(f.binder, aa.metadata.baseSelector)((b, sel) => b(sel))
     ^(aa.metadata.errorContext, r)(_.selector #> _) orElse r
   }
 
