@@ -28,18 +28,18 @@ trait HtmlForms {
   def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
 
   /**
-   * Returns a [[FormValidation]] that checks that the input exists and also
-   * applies a HTML5 required attribute to the form.
-   */
+    * Returns a [[FormValidation]] that checks that the input exists and also
+    * applies a HTML5 required attribute to the form.
+    */
   def html5Required[A]: FormValidation[Option[A],A] =
     FormValidation(
       a => liftStringV(required(a)),
       Some(s => s"$s [required]" #> "required"))
 
   /**
-   * Groups a form under a class selector of `className` with a context of the
-   * same.
-   */
+    * Groups a form under a class selector of `className` with a context of the
+    * same.
+    */
   def group[A](className: String, contents: Form[A]): Form[A] =
     contents.mapResult(aa =>
       BoundForm(
@@ -49,8 +49,8 @@ trait HtmlForms {
     ).context(className)
 
   /**
-   * Binds the provided form to the provided selector and binds nested errors.
-   */
+    * Binds the provided form to the provided selector and binds nested errors.
+    */
   def field[A](
     selector: String, contents: Form[A]
   )(
@@ -179,10 +179,10 @@ trait HtmlForms {
     )
 
   /**
-   * Creates a form that selects from a list of values, bound using the provided
-   * [[ChoiceBinder]]. In order to select a value, the form must be run
-   * using the the same [[FormState]] as that used to create the form initially.
-   */
+    * Creates a form that selects from a list of values, bound using the provided
+    * [[ChoiceBinder]]. In order to select a value, the form must be run
+    * using the the same [[FormState]] as that used to create the form initially.
+    */
   def choices[A](
     name: String,
     default: List[A],

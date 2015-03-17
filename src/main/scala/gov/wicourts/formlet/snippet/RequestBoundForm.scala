@@ -10,13 +10,13 @@ import xml._
 
 object RequestBoundForm {
   /**
-   * Creates a new function for binding a form to a template. N.B. The
-   * result be assigned to a `val` that persists across requests (for example,
-   * a val in a snippet singleton object).
-   *
-   * @param form The form to bind. It will be recreated when processing a request.
-   * @param process The function to call when the form is successfully validated.
-   */
+    * Creates a new function for binding a form to a template. N.B. The
+    * result be assigned to a `val` that persists across requests (for example,
+    * a val in a snippet singleton object).
+    *
+    * @param form The form to bind. It will be recreated when processing a request.
+    * @param process The function to call when the form is successfully validated.
+    */
   def newBinder[A](form: => Form[A])(process: A => Unit): NodeSeq => NodeSeq = {
     create(newFormState, form)(process)
   }

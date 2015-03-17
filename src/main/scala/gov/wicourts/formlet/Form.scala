@@ -170,10 +170,10 @@ case class ErrorContext(
 )
 
 /**
- * @param label An optional label (for example, a form field's label)
- * @param baseSelector An optional CSS selector that can be used
- * to make further modifications to the form
- */
+  * @param label An optional label (for example, a form field's label)
+  * @param baseSelector An optional CSS selector that can be used
+  * to make further modifications to the form
+  */
 case class FormMetadata(
   label: Option[String],
   baseSelector: Option[String],
