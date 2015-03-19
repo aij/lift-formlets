@@ -46,8 +46,7 @@ object Env {
   private [formlet] def single(env: Env, name: String): Option[String] = env.param(name).headOption
 }
 
-/**
-  * @param validation The function that performs the validation
+/** @param validation The function that performs the validation
   * @param binder An optional binder to apply to the form
   *
   * @tparam A The input type
@@ -71,10 +70,7 @@ case class FormValidation[A,B](
       }
     )
 
-  /**
-    * Flattens a validation returning a `List[C]` to a validation returning
-    * a `C`.
-    */
+  /** Flattens a validation returning a `List[C]` to a validation returning a `C`. */
   def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
     new FormValidation(a => this.validation(a).map(_ => f(a)), this.binder)
 
@@ -109,8 +105,7 @@ trait FormValidationInstances {
 
 object FormValidation extends FormValidationInstances
 
-/**
-  * @param error The error to display
+/** @param error The error to display
   * @param label An optional label (for example, the label of a form field)
   */
 case class FormError(
@@ -118,8 +113,7 @@ case class FormError(
   label: Option[String] = None
 )
 
-/**
-  * A named wrapper around a value of type `A` which is used to provide
+/** A named wrapper around a value of type `A` which is used to provide
   * the current value of dependent form value when validating forms that
   * depend on other forms.
   */
@@ -169,8 +163,7 @@ case class ErrorContext(
   errorBinder: ErrorBinder
 )
 
-/**
-  * @param label An optional label (for example, a form field's label)
+/** @param label An optional label (for example, a form field's label)
   * @param baseSelector An optional CSS selector that can be used
   * to make further modifications to the form
   */
@@ -221,8 +214,7 @@ object FormMetadata {
     BoundForm.formMetadata[A] >=> metadataBaseSelector
 }
 
-/**
-  * The result of running a form
+/** The result of running a form
   *
   * @param result The form's value
   * @param metadata Used by other combinators to modify their behavior
@@ -247,16 +239,14 @@ object BoundForm {
     )
 }
 
-/**
-  * All forms are instance of this class
+/** All forms are instance of this class
   *
   * @tparam A The type of the form's value
   */
 case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   import Form._
 
-  /**
-    * Runs this form using the provided environment and initial state (defaulting to
+  /** Runs this form using the provided environment and initial state (defaulting to
     * an empty state).
     */
   def run(env: Env, initialState: FormState = FormState(true)): (FormState, BoundForm[A]) =
@@ -265,14 +255,12 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   /** Runs this form with an empty environment and state */
   def runEmpty: (FormState, BoundForm[A]) = run(Env.emptyEnv)
 
-  /**
-    * Runs this form with an empty environment and returns the result,
+  /** Runs this form with an empty environment and returns the result,
     * discarding any state.
     */
   def evalEmpty: BoundForm[A] = runEmpty._2
 
-  /**
-    * Returns a form that runs this form and saves the result to the current
+  /** Returns a form that runs this form and saves the result to the current
     * `FormState`. Running the resulting form again will return the same result
     * as long as the same `FormState` is used.
     */
@@ -288,8 +276,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       } yield w)
   }
 
-  /**
-    * Returns a form that runs this form in the provided context. This is used
+  /** Returns a form that runs this form in the provided context. This is used
     * to scope form field input names.
     */
   def context(c: String): Form[A] = {
@@ -316,8 +303,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         aa.metadata merge ff.metadata,
         aa.binder & ff.binder))
 
-  /**
-    * Returns a form that maps the form's result through the provided
+  /** Returns a form that maps the form's result through the provided
     * form validation. The returned form will apply the form validation's
     * binder to this form's result.
     */
@@ -364,8 +350,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     } yield c.errorBinder.apply(state, c.selector, errors)
   }
 
-  /**
-    * A convenience method that maps this form through a string-based
+  /** A convenience method that maps this form through a string-based
     * validation.
     */
   def mapStringV[B](f: A => Validation[String,B]): Form[B] =
@@ -472,15 +457,13 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
         BoundForm(result, aa.metadata, mappedErrors(s, all, aa, result))
       })
 
-  /**
-    * Lifts a form returning a validation into a form that returns a value of
+  /** Lifts a form returning a validation into a form that returns a value of
     * the type of validation
     */
   def liftV[C](implicit ev: A <:< ValidationNelE[C]): Form[C] =
     mapResult(x => x.copy(result = x.result.fold(_.failure[C], a => a: ValidationNelE[C])))
 
-  /**
-    * Lifts a form returning a string-based validation into a form that
+  /** Lifts a form returning a string-based validation into a form that
     * returns a value of the type of validation
     */
   def liftStringV[C](implicit ev: A <:< ValidationNelS[C]): Form[C] =
