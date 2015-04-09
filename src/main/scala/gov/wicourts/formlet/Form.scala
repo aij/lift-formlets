@@ -9,6 +9,8 @@ import xml._
 import scalaz._
 import Scalaz._
 
+import AlignFunctions._
+
 /** Represents a form's input */
 trait Env {
   /** Returns the value of a given parameter */
@@ -62,17 +64,12 @@ case class FormValidation[A,B](
   def ap[C](f: => FormValidation[A,B => C]): FormValidation[A,C] =
     FormValidation(
       a => this.validation(a) <*> f.validation(a),
-      (this.binder, f.binder) match {
-        case (Some(t1), Some(t2)) => Some((s: String) => t1(s) & t2(s))
-        case (f1@Some(_), None) => f1
-        case (None, f2@Some(_)) => f2
-        case (None, None) => None
-      }
+      combine(this.binder, f.binder)((a, b) => { s: String => a(s) & b(s)}.some)
     )
 
   /** Flattens a validation returning a `List[C]` to a validation returning a `C`. */
   def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
-    new FormValidation(a => this.validation(a).map(_ => f(a)), this.binder)
+    new FormValidation[A,C](a => this.validation(a).map(_ => f(a)), this.binder)
 
   /** Returns a copy of this [[FormValidation]] with the binder set to the provided function */
   def setBinder(f: String => CssSel): FormValidation[A,B] = this.copy(binder = Some(f))
@@ -173,11 +170,7 @@ case class FormMetadata(
   errorContext: Option[ErrorContext]
 ) {
   private def eitherOrNone[A](a: Option[A], b: Option[A]): Option[A] =
-    (a, b) match {
-      case (None, None) | (Some(_), Some(_)) => None
-      case (None, s@Some(_)) => s
-      case (s@Some(_), None) => s
-    }
+    combine(a, b)((_, _) => None)
 
   def merge(other: FormMetadata): FormMetadata = {
     FormMetadata(
