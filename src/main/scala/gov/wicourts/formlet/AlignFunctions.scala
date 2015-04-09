@@ -6,7 +6,9 @@ import scalaz.\&/.{Both, That, This}
 
 object AlignFunctions {
   def combine[F[_],A](
-    a1: F[A], a2: F[A])(f: (A, A) => F[A]
+    a1: F[A], a2: F[A]
+  )(
+    f: (A, A) => F[A]
   )(
     implicit F: Align[F], M: Monad[F]
   ): F[A] = {
