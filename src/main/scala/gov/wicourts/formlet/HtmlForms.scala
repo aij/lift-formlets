@@ -59,7 +59,8 @@ trait HtmlForms {
         BoundForm(
           setLabel(aa.result, aa.metadata.label),
           aa.metadata.setErrorContext(errContext),
-          selector #> aa.binder & errorBinder.apply(s, selector, aa.errors))
+          selector #> aa.binder &
+            errorBinder.apply(s, selector, aa.metadata.baseSelector, aa.errors))
       }
     )
 
@@ -351,11 +352,11 @@ trait HtmlForms {
   }
 
   object EmptyErrorBinder {
-    implicit val errorBinder = ErrorBinder((selector, errors) => cssSelZero)
+    implicit val errorBinder = ErrorBinder((selector, baseSelector, errors) => cssSelZero)
   }
 
   object FoundationErrorBinder {
-    implicit val errorBinder = ErrorBinder((selector, errors) =>
+    implicit val errorBinder = ErrorBinder((selector, baseSelector, errors) =>
       s"$selector [class+]" #> "error" &
         s"$selector *+" #> (errors.map(n => <small class="error">{n.error}</small>): NodeSeq)
     )

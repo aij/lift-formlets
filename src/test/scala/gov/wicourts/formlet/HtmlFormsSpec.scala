@@ -16,9 +16,14 @@ class HtmlFormsSpec extends FormletSpec {
 
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._
-  import HtmlForms.FoundationErrorBinder._
 
   val F = Form.F
+
+  implicit val errorBinder = ErrorBinder((selector, baseSelector, errors) =>
+    s"$selector [class+]" #> "error" &
+      s"$selector *+" #> (errors.map(n => <small class="error">{n.error}</small>): NodeSeq) &
+      s"$selector" #> baseSelector.map(b => s"$b [aria-invalid]" #> "true").getOrElse(cssSelZero)
+  )
 
   def testEnv = new Env {
     def param(s: String) =
@@ -100,7 +105,7 @@ class HtmlFormsSpec extends FormletSpec {
         </div>
       val out =
         <div class="test error">
-          <input type="text" name="test" value="" foo="foo" />
+          <input type="text" name="test" value="" foo="foo" aria-invalid="true" />
           <small class="error">no way!</small>
         </div>
 

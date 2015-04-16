@@ -146,10 +146,15 @@ object FormState {
     formStateValues >=> mapCastLens[String,T](key)
 }
 
-case class ErrorBinder(run: (String, List[FormError]) => CssSel) {
-  def apply(state: FormState, selector: String, errors: List[FormError]): CssSel = {
+case class ErrorBinder(run: (String, Option[String], List[FormError]) => CssSel) {
+  def apply(
+    state: FormState,
+    selector: String,
+    baseSelector: Option[String],
+    errors: List[FormError]
+  ): CssSel = {
     if (state.renderErrors_? && errors.nonEmpty)
-      run(selector, errors)
+      run(selector, baseSelector, errors)
     else
       cssSelZero
   }
@@ -340,7 +345,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     for {
       c <- in.metadata.errorContext
         if in.result.isSuccess && state.renderErrors_? && errors.nonEmpty
-    } yield c.errorBinder.apply(state, c.selector, errors)
+    } yield c.errorBinder.apply(state, c.selector, in.metadata.baseSelector, errors)
   }
 
   /** A convenience method that maps this form through a string-based
