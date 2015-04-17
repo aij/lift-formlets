@@ -11,6 +11,8 @@ import Scalaz._
 
 import AlignFunctions._
 
+import scala.language.higherKinds
+
 /** Represents a form's input */
 trait Env {
   /** Returns the value of a given parameter */
@@ -100,7 +102,21 @@ trait FormValidationInstances {
     }
 }
 
-object FormValidation extends FormValidationInstances
+object FormValidation extends FormValidationInstances {
+  def lift[G[_], A](
+    in: FormValidation[A, A]
+  )(
+    implicit G: ApplicativePlus[G], E: Equal[G[A]], T: Traverse[G]
+  ): FormValidation[G[A], G[A]] = {
+    def f(ga: G[A]): ValidationNelE[G[A]] = {
+      if (E.equal(ga, G.empty))
+        G.empty[A].success
+      else
+        T.traverse(ga)(in.validation)
+    }
+    FormValidation(f, in.binder)
+  }
+}
 
 /** @param error The error to display
   * @param label An optional label (for example, the label of a form field)
