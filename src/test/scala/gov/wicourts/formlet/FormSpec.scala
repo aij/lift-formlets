@@ -30,7 +30,7 @@ class FormSpec extends FormletSpec {
 
   "Validations that depend on another field" >> {
     "should not execute if the dependent fields are not valid" >> {
-      val alwaysFails = FormValidation[String,String](a => liftStringV("not this time".failure))
+      val alwaysFails = FormValidation[String, String](a => liftStringV("not this time".failure))
       val failingForm = Form.failing[String]("no way!")
       val a = F.point[String]("ok")
 
@@ -51,7 +51,7 @@ class FormSpec extends FormletSpec {
     }
 
     "should always apply client-side validation transform" >> {
-      val alwaysFails = FormValidation[String,String](
+      val alwaysFails = FormValidation[String, String](
         a => liftStringV("not this time".failure),
         Some(s => s"$s [data-foo]" #> "foo")
       )

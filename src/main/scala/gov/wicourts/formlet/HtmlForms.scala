@@ -20,17 +20,17 @@ trait HtmlForms {
   type Serializer[A] = A => String
 
   /** Converts an input `String` to a value of type `A` */
-  type Converter[A] = String => Validation[String,A]
+  type Converter[A] = String => Validation[String, A]
 
   val requiredMessage = "Please enter a value"
 
   /** Lifts an optional value of type `A` to a validation of type `A` */
-  def required[A](a: Option[A]): Validation[String,A] = a.toSuccess(requiredMessage)
+  def required[A](a: Option[A]): Validation[String, A] = a.toSuccess(requiredMessage)
 
   /** Returns a [[FormValidation]] that checks that the input exists and also
     * applies a HTML5 required attribute to the form.
     */
-  def html5Required[A]: FormValidation[Option[A],A] =
+  def html5Required[A]: FormValidation[Option[A], A] =
     FormValidation(
       a => liftStringV(required(a)),
       Some(s => s"$s [required]" #> "required"))
@@ -204,7 +204,7 @@ trait HtmlForms {
         formName <- gets[FormState, String](_.contextName(name))
         __var = FormState.newFormStateVar[SelectVar](s"__select__$formName")
         v <- __var.st
-        selectOptions <- v.map(state[FormState,SelectVar]).getOrElse {
+        selectOptions <- v.map(state[FormState, SelectVar]).getOrElse {
           val r = noncedOptions
           (__var := r.some).map(_ => r)
         }

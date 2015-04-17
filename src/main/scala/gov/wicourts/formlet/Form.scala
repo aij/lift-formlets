@@ -56,48 +56,48 @@ object Env {
   * @tparam A The input type
   * @tparam B The output type
   */
-case class FormValidation[A,B](
+case class FormValidation[A, B](
   validation: A => ValidationNelE[B],
   binder: Option[String => CssSel] = None
 ) {
-  def map[C](f: B => C): FormValidation[A,C] =
+  def map[C](f: B => C): FormValidation[A, C] =
     FormValidation(a => validation(a) map f, binder)
 
-  def ap[C](f: => FormValidation[A,B => C]): FormValidation[A,C] =
+  def ap[C](f: => FormValidation[A, B => C]): FormValidation[A, C] =
     FormValidation(
       a => this.validation(a) <*> f.validation(a),
       combine(this.binder, f.binder)((a, b) => { s: String => a(s) & b(s)}.some)
     )
 
   /** Flattens a validation returning a `List[C]` to a validation returning a `C`. */
-  def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A,C] =
-    new FormValidation[A,C](a => this.validation(a).map(_ => f(a)), this.binder)
+  def flatten[C](f: A => C)(implicit ev: B <:< List[C]): FormValidation[A, C] =
+    new FormValidation[A, C](a => this.validation(a).map(_ => f(a)), this.binder)
 
   /** Returns a copy of this [[FormValidation]] with the binder set to the provided function */
-  def setBinder(f: String => CssSel): FormValidation[A,B] = this.copy(binder = Some(f))
+  def setBinder(f: String => CssSel): FormValidation[A, B] = this.copy(binder = Some(f))
 
   /** Lifts this `FormValidation` to one that takes two parameters */
-  def lift1To2V[C]: FormValidation[(FormValue[C], A),B] =
+  def lift1To2V[C]: FormValidation[(FormValue[C], A), B] =
     FormValidation({ case (_, a) => this.validation(a) }, this.binder)
 
   /** Lifts this `FormValidation` to one that takes three parameters */
-  def lift1To3V[C,D]: FormValidation[(FormValue[C], FormValue[D], A),B] =
+  def lift1To3V[C, D]: FormValidation[(FormValue[C], FormValue[D], A), B] =
     FormValidation({ case (_, _, a) => this.validation(a) }, this.binder)
 
   /** Lifts this `FormValidation` to one that takes four parameters */
-  def lift1To4V[C,D,E]: FormValidation[(FormValue[C], FormValue[D], FormValue[E], A),B] =
+  def lift1To4V[C, D, E]: FormValidation[(FormValue[C], FormValue[D], FormValue[E], A), B] =
     FormValidation({ case (_, _, _, a) => this.validation(a) }, this.binder)
 }
 
 trait FormValidationInstances {
   implicit def formValidationApplicative[X]: Applicative[({type f[a] = FormValidation[X, a]})#f] =
     new Applicative[({type f[a] = FormValidation[X, a]})#f] {
-      override def map[A, B](a: FormValidation[X,A])(f: A => B): FormValidation[X,B] = a map f
+      override def map[A, B](a: FormValidation[X, A])(f: A => B): FormValidation[X, B] = a map f
 
       override def point[A](a: => A) =
-        FormValidation[X,A](_ => a.success, None)
+        FormValidation[X, A](_ => a.success, None)
 
-      override def ap[A,B](fa: => FormValidation[X,A])(f: => FormValidation[X,A=>B]): FormValidation[X,B] =
+      override def ap[A, B](fa: => FormValidation[X, A])(f: => FormValidation[X, A=>B]): FormValidation[X, B] =
         fa ap f
     }
 }
@@ -133,7 +133,7 @@ case class FormError(
 case class FormValue[A](label: Option[String], value: A)
 
 case class FormState (
-  private [formlet] values: Map[String,Any],
+  private [formlet] values: Map[String, Any],
   private [formlet] context: List[String],
   renderErrors_? : Boolean) {
   def pushContext(s: String): FormState = this.copy(context = s :: context)
@@ -144,22 +144,22 @@ case class FormState (
 
 object FormState {
   def apply(renderErrors: Boolean): FormState =
-    FormState(Map[String,Any](), Nil, renderErrors)
+    FormState(Map[String, Any](), Nil, renderErrors)
 
-  private val formStateValues: FormState @> Map[String,Any] =
-    Lens.lensu[FormState,Map[String,Any]](
+  private val formStateValues: FormState @> Map[String, Any] =
+    Lens.lensu[FormState, Map[String, Any]](
       (a, v) => a.copy(values = v),
       _.values
     )
 
-  private def mapCastLens[K,V](k: K): Map[K,Any] @> Option[V] =
-    Lens.lensu[Map[K,Any],Option[V]](
+  private def mapCastLens[K, V](k: K): Map[K, Any] @> Option[V] =
+    Lens.lensu[Map[K, Any], Option[V]](
       (a, o) => o map (a.updated(k, _)) getOrElse (a - k),
       _ get k map (_.asInstanceOf[V])
     )
 
   def newFormStateVar[T](key: String = nextFuncName): FormState @> Option[T] =
-    formStateValues >=> mapCastLens[String,T](key)
+    formStateValues >=> mapCastLens[String, T](key)
 }
 
 case class ErrorBinder(run: (String, Option[String], List[FormError]) => CssSel) {
@@ -211,12 +211,12 @@ case class FormMetadata(
 object FormMetadata {
   def empty: FormMetadata = FormMetadata(None, None, None)
 
-  private val metadataLabel = Lens.lensu[FormMetadata,Option[String]](
+  private val metadataLabel = Lens.lensu[FormMetadata, Option[String]](
     (a, value) => a.copy(label = value),
     _.label
   )
 
-  private val metadataBaseSelector = Lens.lensu[FormMetadata,Option[String]](
+  private val metadataBaseSelector = Lens.lensu[FormMetadata, Option[String]](
     (a, value) => a.copy(baseSelector = value),
     _.baseSelector
   )
@@ -247,7 +247,7 @@ case class BoundForm[A](
 
 object BoundForm {
   def formMetadata[A]: BoundForm[A] @> FormMetadata =
-    Lens.lensu[BoundForm[A],FormMetadata](
+    Lens.lensu[BoundForm[A], FormMetadata](
       (a, value) => a.copy(metadata = value),
       _.metadata
     )
@@ -257,7 +257,7 @@ object BoundForm {
   *
   * @tparam A The type of the form's value
   */
-case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
+case class Form[A](runForm: Env => State[FormState, BoundForm[A]]) {
   import Form._
 
   /** Runs this form using the provided environment and initial state (defaulting to
@@ -283,7 +283,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     Form(env =>
       for {
         v <- __var.st
-        w <- v.map(state[FormState,BoundForm[A]]).getOrElse(for {
+        w <- v.map(state[FormState, BoundForm[A]]).getOrElse(for {
             aa <- this.runForm(env)
             _ <- __var := aa.some
           } yield aa)
@@ -321,7 +321,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     * form validation. The returned form will apply the form validation's
     * binder to this form's result.
     */
-  def mapV[B](f: FormValidation[A,B]): Form[B] =
+  def mapV[B](f: FormValidation[A, B]): Form[B] =
     Form(env =>
       for {
         s <- get[FormState]
@@ -334,9 +334,9 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
           mappedErrors(s, f, aa, bb))
       })
 
-  private def mappedErrors[B,C,D](
+  private def mappedErrors[B, C, D](
     state: FormState,
-    f: FormValidation[C,D],
+    f: FormValidation[C, D],
     aa: BoundForm[A],
     out: ValidationNelE[B]
   ): CssSel = {
@@ -344,9 +344,9 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
     l.fold(aa.binder)(_ & _)
   }
 
-  private def clientSideErrBinder[B,C](
+  private def clientSideErrBinder[B, C](
     aa: BoundForm[A],
-    f: FormValidation[B,C]
+    f: FormValidation[B, C]
   ): Option[CssSel] = {
     val r = ^(f.binder, aa.metadata.baseSelector)((b, sel) => b(sel))
     ^(aa.metadata.errorContext, r)(_.selector #> _) orElse r
@@ -367,11 +367,11 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
   /** A convenience method that maps this form through a string-based
     * validation.
     */
-  def mapStringV[B](f: A => Validation[String,B]): Form[B] =
+  def mapStringV[B](f: A => Validation[String, B]): Form[B] =
     this.mapV(FormValidation(a => FormHelpers.liftStringV(f(a)), None))
 
   /** Validates this form using the provided validations */
-  def ??(fs: FormValidation[A,A]*): Form[A] =
+  def ??(fs: FormValidation[A, A]*): Form[A] =
     this.mapV(fs.toList.sequenceU.flatten(identity))
 
   /** Transforms the result of this form */
@@ -416,7 +416,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       })
 
   /** Validates this form using the result of two other forms as input. */
-  def val3[B,C](
+  def val3[B, C](
     b: Form[B], c: Form[C]
   )(
     fs: FormValidation[(FormValue[B], FormValue[C], A), A]*
@@ -443,7 +443,7 @@ case class Form[A](runForm: Env => State[FormState,BoundForm[A]]) {
       })
 
   /** Validates this form using the result of three other forms as input. */
-  def val4[B,C,D](
+  def val4[B, C, D](
     b: Form[B], c: Form[C], d: Form[D]
   )(
     fs: FormValidation[(FormValue[B], FormValue[C], FormValue[D], A), A]*
@@ -491,7 +491,7 @@ trait FormInstances {
     override def point[A](a: => A): Form[A] =
       FormHelpers.liftResult(BoundForm(a.success, FormMetadata.empty, cssSelZero))
 
-    override def ap[A,B](fa: => Form[A])(f: => Form[A=>B]): Form[B] =
+    override def ap[A, B](fa: => Form[A])(f: => Form[A=>B]): Form[B] =
       fa ap f
   }
 }
@@ -519,23 +519,23 @@ object Form extends FormInstances {
 
 object FormHelpers {
   /** Lifts a function of two parameters into the equivalent [[FormValidation]] */
-  def lift2V[A,B](f: (FormValue[B], A) => ValidationNelE[A]): FormValidation[(FormValue[B],A),A] =
+  def lift2V[A, B](f: (FormValue[B], A) => ValidationNelE[A]): FormValidation[(FormValue[B], A), A] =
     FormValidation({ case (bn, a) => f(bn, a) }, None)
 
   /** Lifts a function of three parameters into the equivalent [[FormValidation]] */
-  def lift3V[A,B,C](
+  def lift3V[A, B, C](
     f: (FormValue[B], FormValue[C], A) => ValidationNelE[A]
-  ): FormValidation[(FormValue[B],FormValue[C],A),A] =
+  ): FormValidation[(FormValue[B], FormValue[C], A), A] =
     FormValidation({ case (bn, cn, a) => f(bn, cn, a) }, None)
 
   /** Lifts a function of four parameters into the equivalent [[FormValidation]] */
-  def lift4V[A,B,C,D](
+  def lift4V[A, B, C, D](
     f: (FormValue[B], FormValue[C], FormValue[D], A) => ValidationNelE[A]
-  ): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+  ): FormValidation[(FormValue[B], FormValue[C], FormValue[D], A), A] =
     FormValidation({ case (bn, cn, dn, a) => f(bn, cn, dn, a) }, None)
 
   /** Lifts a string-based validation into the validation used by a form's result */
-  def liftStringV[A](in: Validation[String,A]): ValidationNelE[A] =
+  def liftStringV[A](in: Validation[String, A]): ValidationNelE[A] =
     in.leftMap(s => FormError(Text(s))).toValidationNel
 
   /** Lifts a list of string-based validations into the validation used by a form's result */
@@ -549,14 +549,14 @@ object FormHelpers {
       yield form)
 
   /** Lifts a `FormValidation` with two parameters to one of three */
-  def lift2To3V[A,B,C](in: FormValidation[(FormValue[B],A),A]): FormValidation[(FormValue[B],FormValue[C],A),A] =
+  def lift2To3V[A, B, C](in: FormValidation[(FormValue[B], A), A]): FormValidation[(FormValue[B], FormValue[C], A), A] =
     FormValidation({ case (b, _, a) => in.validation((b, a)) }, in.binder)
 
   /** Lifts a `FormValidation` with two parameters to one of four */
-  def lift2To4V[A,B,C,D](in: FormValidation[(FormValue[B],A),A]): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+  def lift2To4V[A, B, C, D](in: FormValidation[(FormValue[B], A), A]): FormValidation[(FormValue[B], FormValue[C], FormValue[D], A), A] =
     FormValidation({ case (b, _, _, a) => in.validation((b, a)) }, in.binder)
 
   /** Lifts a `FormValidation` with three parameters to one of four */
-  def lift3To4V[A,B,C,D](in: FormValidation[(FormValue[B],FormValue[C],A),A]): FormValidation[(FormValue[B],FormValue[C],FormValue[D],A),A] =
+  def lift3To4V[A, B, C, D](in: FormValidation[(FormValue[B], FormValue[C], A), A]): FormValidation[(FormValue[B], FormValue[C], FormValue[D], A), A] =
     FormValidation({ case (b, c, _, a) => in.validation((b, c, a)) }, in.binder)
 }

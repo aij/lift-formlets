@@ -112,7 +112,7 @@ class HtmlFormsSpec extends FormletSpec {
       val other = F.point("hi!")
 
       val f = field(".test", input[String]("test", None))
-      val v = FormValidation[Option[String],Option[String]](
+      val v = FormValidation[Option[String], Option[String]](
         a => liftStringV("no way!".failure),
         Some(s => s"$s [foo]" #> "foo")
       )
@@ -355,7 +355,7 @@ class HtmlFormsSpec extends FormletSpec {
         ".lastName",
         input[String]("lastName", None) <* label("Last name"))
 
-      def requireIfOtherSet[B,A](bn: FormValue[Option[B]], a: Option[A]): ValidationNelE[Option[A]] = {
+      def requireIfOtherSet[B, A](bn: FormValue[Option[B]], a: Option[A]): ValidationNelE[Option[A]] = {
         val result =
           if (bn.value.isDefined && a.isEmpty)
             ("This field is required if the " + bn.label.getOrElse("N/A") + " field is set").failure
