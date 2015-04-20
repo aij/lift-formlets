@@ -16,11 +16,10 @@ import gov.wicourts.formlet.Form._
 trait HtmlForms {
   import FormHelpers._
 
-  /** Serializes a values of type `A` to a `String`. */
-  type Serializer[A] = A => String
-
-  /** Converts an input `String` to a value of type `A` */
-  type Converter[A] = String => Validation[String, A]
+  trait Converter[A] {
+    def serialize(a: A): String
+    def convert(s: String): Validation[String, A]
+  }
 
   val requiredMessage = "Please enter a value"
 
@@ -65,14 +64,19 @@ trait HtmlForms {
     )
 
   /** An `&lt;input&gt;` form */
-  def input[A](name: String, default: Option[A])(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
+  def input[A](
+    name: String, default: Option[A]
+  )(
+    implicit converter: Converter[Option[A]]
+  ): Form[Option[A]] = {
     baseInput("input", "input [name]", "input [value]", name, default)
   }
 
   /** An `&lt;textarea&gt;` form */
-  def textarea[A](name: String, default: Option[A])(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]): Form[Option[A]] = {
+  def textarea[A](name: String, default: Option[A]
+  )(
+    implicit converter: Converter[Option[A]]
+  ): Form[Option[A]] = {
     baseInput("textarea", "textarea [name]", "textarea *", name, default)
   }
 
@@ -261,7 +265,7 @@ trait HtmlForms {
   def checkbox(
     name: String, default: Boolean
   )(
-    implicit serializer: Serializer[Boolean], converter: Converter[Boolean]
+    implicit converter: Converter[Boolean]
   ): Form[Boolean] = {
     def checked(in: Boolean) = {
       if (in)
@@ -273,7 +277,7 @@ trait HtmlForms {
     fresult { (env, state) =>
       val formName = state.contextName(name)
       val userInput = Env.single(env, formName)
-      val formValue = userInput map converter getOrElse default.success
+      val formValue = userInput map converter.convert getOrElse default.success
       BoundForm(
         liftStringV(formValue),
         FormMetadata(None, "input".some, None),
@@ -309,46 +313,49 @@ trait HtmlForms {
     name: String,
     default: Option[A]
   )(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+    implicit converter: Converter[Option[A]]
   ): Form[Option[A]] = {
     fresult { (env, state) =>
       val formName = state.contextName(name)
       val userInput = Env.single(env, formName)
-      val formValue = userInput map converter getOrElse default.success
+      val formValue = userInput map converter.convert getOrElse default.success
       BoundForm(
         liftStringV(formValue),
         FormMetadata(None, baseSelector.some, None),
-        nameSelector #> formName & valueSelector #> (userInput | serializer(default)))
+        nameSelector #> formName & valueSelector #> (userInput | converter.serialize(default)))
     }
   }
 
   /** A `&lt;label&gt;` form */
   def label(label: String): Form[Unit] = sel("label *" #> label, label.some)
 
-  /** [[Converter]] and [[Serializer]] instances for standard types */
+  /** [[Converter]] instances for standard types */
   object DefaultFieldHelpers {
-    implicit val stringConverter: Converter[String] = s => s.success
+    implicit val stringConverter: Converter[String] = new Converter[String] {
+      override def serialize(s: String): String = s
+      override def convert(s: String): Validation[String, String] = s.success
+    }
 
-    implicit val booleanSerializer: Serializer[Boolean] = _.toString
+    implicit val booleanConverter: Converter[Boolean] = new Converter[Boolean] {
+      override def serialize(b: Boolean) = b.toString
+      override def convert(s: String) = asBoolean(s).openOr(false).success
+    }
 
-    implicit val booleanConverter: Converter[Boolean] = s =>
-      asBoolean(s).openOr(false).success
+    implicit val intConverter: Converter[Int] = new Converter[Int] {
+      override def serialize(i: Int) = i.toString
+      override def convert(s: String) = s.parseInt.leftMap(_ => "Please enter a whole number")
+    }
 
-    implicit val intConverter: Converter[Int] = s =>
-      s.parseInt.leftMap(_ => "Please enter a whole number")
-
-    implicit val intSerializer: Serializer[Int] = _.toString
-
-    implicit val longConverter: Converter[Long] = s =>
-      s.parseLong.leftMap(_ => "Please enter a whole number")
-
-    implicit val longSerializer: Serializer[Long] = _.toString
-
-    implicit def optionSerializer[A](implicit s: Serializer[A]): Serializer[Option[A]] =
-      _.map(s(_)).getOrElse("")
+    implicit val longConverter: Converter[Long] = new Converter[Long] {
+      override def serialize(i: Long) = i.toString
+      override def convert(s: String) = s.parseLong.leftMap(_ => "Please enter a whole number")
+    }
 
     implicit def optionConverter[A](implicit c: Converter[A]): Converter[Option[A]] =
-      c(_).map(Some(_))
+      new Converter[Option[A]] {
+        override def serialize(a: Option[A]) = a.map(c.serialize).getOrElse("")
+        override def convert(s: String) = c.convert(s).map(Some(_))
+      }
   }
 
   object EmptyErrorBinder {
