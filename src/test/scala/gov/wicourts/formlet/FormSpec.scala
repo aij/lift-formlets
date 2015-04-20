@@ -23,8 +23,22 @@ class FormSpec extends FormletSpec {
 
   "A failing form" >> {
     "should fail with the provided message" >> {
-      val (_, r) = Form.failing("no way!").runEmpty
+      val r = Form.failing("no way!").evalEmpty
       r.errorsNs must_== List(Text("no way!"))
+    }
+  }
+
+  "A form" >> {
+    "can be described" >> {
+      val a = F.point[String]("ok").describe(a => "a: " + a)
+      val b = F.point[String]("really ok").describe(b => "b: " + b)
+      val c = Form.failing[String]("nope!")
+
+      val d = F.tuple3(a, b, c)
+
+      val (w, _, _) = d.runEmpty
+
+      w must_== Vector("b: really ok", "a: ok")
     }
   }
 
@@ -78,15 +92,15 @@ class FormSpec extends FormletSpec {
 
   "A validated form" >> {
     "should process all its validations" >> {
-      val (_, r) =
+      val r =
         (F.point("hi".some)
           ?? (StringValidation(_ => "nope".failure), StringValidation(_ => "definitely not".failure)))
-          .runEmpty
+          .evalEmpty
       r.errorsNs must_== List(Text("nope"), Text("definitely not"))
     }
     "should process validations in groups" >> {
-      val (_, r) =
-        (F.point("hi".some) ?? StringValidation(_ => "nope".failure) ?? StringValidation(_ => "definitely not".failure)).runEmpty
+      val r =
+        (F.point("hi".some) ?? StringValidation(_ => "nope".failure) ?? StringValidation(_ => "definitely not".failure)).evalEmpty
       r.errorsNs must_== List(Text("nope"))
     }
   }

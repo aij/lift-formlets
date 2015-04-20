@@ -17,7 +17,7 @@ object RequestBoundForm {
     * @param form The form to bind. It will be recreated when processing a request.
     * @param process The function to call when the form is successfully validated.
     */
-  def newBinder[A](form: => Form[A])(process: A => Unit): NodeSeq => NodeSeq = {
+  def newBinder[A](form: => Form[A])(process: (Vector[String], A) => Unit): NodeSeq => NodeSeq = {
     create(newFormState, form)(process)
   }
 
@@ -28,7 +28,11 @@ object RequestBoundForm {
     }
   }
 
-  private def create[A](formState: RequestVar[FormState], form: => Form[A])(process: A => Unit): NodeSeq => NodeSeq = {
+  private def create[A](
+    formState: RequestVar[FormState], form: => Form[A]
+  )(
+    process: (Vector[String], A) => Unit
+  ): NodeSeq => NodeSeq = {
     // This is kind of awkward. On submission, we want to run the form right
     // away. On the other hand, we don't want to run it again when it's time
     // to display it.
@@ -40,14 +44,17 @@ object RequestBoundForm {
       ns: NodeSeq =>
         val (s, a) = currentResult.get
           .map(a => (formState.get, a))
-          .getOrElse(form.run(Env.emptyEnv, formState.get))
+          .getOrElse {
+            val r = form.run(Env.emptyEnv, formState.get)
+            (r._3, r._2)
+          }
 
         val processSubmission: Elem = SHtml.hidden(() => {
           formState.set(s.copy(renderErrors_? = true))
 
-          val (s2, a2) = form.run(Env.paramsEnv, formState.get)
+          val (w, a2, s2) = form.run(Env.paramsEnv, formState.get)
 
-          a2.result.foreach(process)
+          a2.result.foreach(process(w, _))
 
           currentResult.set(Some(a2))
           formState.set(s2)

@@ -42,12 +42,12 @@ class HtmlFormsSpec extends FormletSpec {
 
   "An input form" >> {
     "should return its default with empty environment" >> {
-      val (_, r) = input("test", "test default".some).runEmpty
+      val r = input("test", "test default".some).evalEmpty
       r.result must_== "test default".some.success
     }
 
     "should return environment value if provided" >> {
-      val (_, r) = input("test", "test default".some).run(testEnv)
+      val r = input("test", "test default".some).eval(testEnv)
       r.result must_== "test value".some.success
     }
 
@@ -72,16 +72,16 @@ class HtmlFormsSpec extends FormletSpec {
 
   "A field form" >> {
     "should be named by its label" >> {
-      val (_, r) = field(".test", label("test label")).runEmpty
+      val r = field(".test", label("test label")).evalEmpty
       r.metadata.label must_== "test label".some
     }
 
     "should set error label to its label" >> {
       val errorMessage = "something went wrong"
       val l = "test label"
-      val (_, r) = field(
+      val r = field(
         ".test",
-        Form.failing(errorMessage) <* label(l)).runEmpty
+        Form.failing(errorMessage) <* label(l)).evalEmpty
 
       r.result must_== FormError(Text(errorMessage), l.some).failure.toValidationNel
     }
@@ -157,12 +157,12 @@ class HtmlFormsSpec extends FormletSpec {
 
   "A required form" >> {
     "should fail if form is empty" >> {
-      val (_, r) = F.point(None).mapStringV(required).runEmpty
+      val r = F.point(None).mapStringV(required).evalEmpty
       r.errorsNs must_== List(Text(HtmlForms.requiredMessage))
     }
 
     "should succeed if form has a value" >> {
-      val (_, r) = F.point("hi".some).mapStringV(required).runEmpty
+      val r = F.point("hi".some).mapStringV(required).evalEmpty
       r.result must_== "hi".success
     }
   }
@@ -182,9 +182,9 @@ class HtmlFormsSpec extends FormletSpec {
 
       val sel = choice("test", None, options)(transform _).required
 
-      val (s, r) = sel.runEmpty
+      val (_, r, s) = sel.runEmpty
       val nonces = r.binder.apply(<div></div>).toString.split(",")
-      val (_, r2) = sel.run(Env.singleEnv(Map("test" -> nonces(1))), s)
+      val (_, r2, _) = sel.run(Env.singleEnv(Map("test" -> nonces(1))), s)
 
       r2.result must_== 2.success
     }
@@ -309,14 +309,14 @@ class HtmlFormsSpec extends FormletSpec {
         // Turn firstName (a Form[String]) and a lastName (a Form[String]) into
         // a Form[FullName]
         val fullName = ^(firstName, lastName)(FullName.apply _)
-        val (_, r) = fullName.runEmpty
+        val r = fullName.evalEmpty
         r.result must_== FullName("Frank", "Johnson").success
       }
 
       "can combine using an applicative builder" >> {
         // Same as above with different syntax
         val fullName = (firstName |@| lastName)(FullName.apply _)
-        val (_, r) = fullName.runEmpty
+        val r = fullName.evalEmpty
         r.result must_== FullName("Frank", "Johnson").success
       }
 
@@ -327,7 +327,7 @@ class HtmlFormsSpec extends FormletSpec {
           StringValidation(s => if (s.startsWith("Frank")) s.success else "Only Frank is allowed".failure)))
 
         val fullName = ^(frankFirstName, lastName)(FullName.apply _)
-        val (_, r) = fullName.run(env)
+        val r = fullName.eval(env)
 
         r.errorsNs must_== List(Text("Only Frank is allowed"))
       }
@@ -345,7 +345,7 @@ class HtmlFormsSpec extends FormletSpec {
       )
 
       "can combine multiple optional fields" >> {
-        val (_, r) = optionalFullName(firstName, lastName).runEmpty
+        val r = optionalFullName(firstName, lastName).evalEmpty
         r.result must_== None.success
       }
     }
@@ -371,19 +371,19 @@ class HtmlFormsSpec extends FormletSpec {
       val fullName = optionalFullName(firstName, lastName)
 
       "first name won't be required if last name isn't set" >> {
-        val (_, r) = fullName.runEmpty
+        val r = fullName.evalEmpty
         r.result must_== None.success
       }
 
       "will return a FullName if both are set" >> {
         val env = Env.singleEnv(Map("firstName" -> "Frank", "lastName" -> "Johnson"))
-        val (_, r) = fullName.run(env)
+        val r = fullName.eval(env)
         r.result must_== FullName("Frank", "Johnson").some.success
       }
 
       "will return an error if only last name is set" >> {
         val env = Env.singleEnv(Map("lastName" -> "Johnson"))
-        val (_, r) = fullName.run(env)
+        val r = fullName.eval(env)
         r.errorsNs must_== List(Text("This field is required if the Last name field is set"))
       }
     }

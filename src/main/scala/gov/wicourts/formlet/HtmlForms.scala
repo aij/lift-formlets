@@ -51,7 +51,7 @@ trait HtmlForms {
   ): Form[A] =
     Form(env =>
       for {
-        s <- get[FormState]
+        s <- Form.RWSM.get
         aa <- contents.runForm(env)
       } yield {
         val errContext = ErrorContext(selector, errorBinder)
@@ -205,12 +205,12 @@ trait HtmlForms {
 
     Form(env =>
       for {
-        formName <- gets[FormState, String](_.contextName(name))
+        formName <- Form.RWSM.gets[String](_.contextName(name))
         __var = FormState.newFormStateVar[SelectVar](s"__select__$formName")
-        v <- __var.st
-        selectOptions <- v.map(state[FormState, SelectVar]).getOrElse {
+        v <- __var.st.rwst[Vector[String], Unit]
+        selectOptions <- v.map(Form.RWSM.state[SelectVar]).getOrElse {
           val r = noncedOptions
-          (__var := r.some).map(_ => r)
+          (__var := r.some).map(_ => r).rwst[Vector[String], Unit]
         }
       } yield {
         val (defaultNonces, options) = selectOptions
