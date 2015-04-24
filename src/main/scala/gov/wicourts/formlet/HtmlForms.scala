@@ -51,7 +51,7 @@ trait HtmlForms {
   ): Form[A] =
     Form(env =>
       for {
-        s <- Form.RWSM.get
+        s <- get[FormState]
         aa <- contents.runForm(env)
       } yield {
         val errContext = ErrorContext(selector, errorBinder)
@@ -205,12 +205,12 @@ trait HtmlForms {
 
     Form(env =>
       for {
-        formName <- Form.RWSM.gets[String](_.contextName(name))
+        formName <- gets[FormState, String](_.contextName(name))
         __var = FormState.newFormStateVar[SelectVar](s"__select__$formName")
-        v <- __var.st.rwst[Vector[String], Unit]
-        selectOptions <- v.map(Form.RWSM.state[SelectVar]).getOrElse {
+        v <- __var.st
+        selectOptions <- v.map(state[FormState, SelectVar]).getOrElse {
           val r = noncedOptions
-          (__var := r.some).map(_ => r).rwst[Vector[String], Unit]
+          (__var := r.some).map(_ => r)
         }
       } yield {
         val (defaultNonces, options) = selectOptions
@@ -228,7 +228,7 @@ trait HtmlForms {
 
         BoundForm(
           liftStringV(formValue.success),
-          FormMetadata(None, selector.some, None),
+          FormMetadata(None, selector.some, None, Vector()),
           sel
         )
       }
@@ -280,7 +280,7 @@ trait HtmlForms {
       val formValue = userInput map converter.convert getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        FormMetadata(None, "input".some, None),
+        FormMetadata(None, "input".some, None, Vector()),
         "input" #> { ns: NodeSeq => ns match {
           case element: Elem => {
             val checkboxNs = <input type="checkbox" name={formName} value="true" />
@@ -300,7 +300,7 @@ trait HtmlForms {
 
       BoundForm(
         result.success,
-        FormMetadata(None, "input".some, None),
+        FormMetadata(None, "input".some, None, Vector()),
         "input [name]" #> formName & "input [type]" #> "file"
       )
     }
@@ -321,7 +321,7 @@ trait HtmlForms {
       val formValue = userInput map converter.convert getOrElse default.success
       BoundForm(
         liftStringV(formValue),
-        FormMetadata(None, baseSelector.some, None),
+        FormMetadata(None, baseSelector.some, None, Vector()),
         nameSelector #> formName & valueSelector #> (userInput | converter.serialize(default)))
     }
   }

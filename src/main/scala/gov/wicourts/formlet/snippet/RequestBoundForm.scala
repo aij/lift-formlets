@@ -59,17 +59,14 @@ object RequestBoundForm {
       ns: NodeSeq =>
         val (s, a) = currentResult.get
           .map(a => (formState.get, a))
-          .getOrElse {
-            val r = form.run(Env.emptyEnv, formState.get)
-            (r._3, r._2)
-          }
+          .getOrElse(form.run(Env.emptyEnv, formState.get))
 
         val processSubmission: Elem = SHtml.hidden(() => {
           formState.set(s.copy(renderErrors_? = true))
 
-          val (w, a2, s2) = form.run(Env.paramsEnv, formState.get)
+          val (s2, a2) = form.run(Env.paramsEnv, formState.get)
 
-          processor.process(w, a2.result)
+          processor.process(a2.metadata.description, a2.result)
 
           currentResult.set(Some(a2))
           formState.set(s2)

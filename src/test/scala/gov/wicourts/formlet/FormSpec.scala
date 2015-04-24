@@ -36,9 +36,9 @@ class FormSpec extends FormletSpec {
 
       val d = F.tuple3(a, b, c)
 
-      val (w, _, _) = d.runEmpty
+      val (_, r) = d.runEmpty
 
-      w must_== Vector("b: really ok", "a: ok")
+      r.metadata.description must_== Vector("a: ok", "b: really ok")
     }
   }
 

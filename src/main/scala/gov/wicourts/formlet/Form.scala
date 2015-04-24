@@ -240,7 +240,8 @@ object FormValidation extends FormValidationInstances {
   case class FormMetadata(
     label: Option[String],
     baseSelector: Option[String],
-    errorContext: Option[ErrorContext]
+    errorContext: Option[ErrorContext],
+    description: Vector[String]
   ) {
     private def eitherOrNone[A](a: Option[A], b: Option[A]): Option[A] =
       combine(a, b)((_, _) => None)
@@ -249,7 +250,8 @@ object FormValidation extends FormValidationInstances {
       FormMetadata(
         Some(List(this.label, other.label).flatten.mkString(" and ")).filterNot(_.isEmpty),
         eitherOrNone(this.baseSelector, other.baseSelector),
-        eitherOrNone(this.errorContext, other.errorContext)
+        eitherOrNone(this.errorContext, other.errorContext),
+        other.description ++ this.description
       )
     }
 
@@ -261,7 +263,7 @@ object FormValidation extends FormValidationInstances {
   }
 
   object FormMetadata {
-    def empty: FormMetadata = FormMetadata(None, None, None)
+    def empty: FormMetadata = FormMetadata(None, None, None, Vector())
 
     private val metadataLabel = Lens.lensu[FormMetadata, Option[String]](
       (a, value) => a.copy(label = value),
@@ -278,6 +280,11 @@ object FormValidation extends FormValidationInstances {
       _.errorContext
     )
 
+    private val metadataDescription = Lens.lensu[FormMetadata, Vector[String]](
+      (a, value) => a.copy(description = value),
+      _.description
+    )
+
     def formLabel[A]: BoundForm[A] @> Option[String] =
       BoundForm.formMetadata[A] >=> metadataLabel
 
@@ -286,6 +293,9 @@ object FormValidation extends FormValidationInstances {
 
     def formErrorContext[A]: BoundForm[A] @> Option[ErrorContext] =
       BoundForm.formMetadata[A] >=> metadataErrorContext
+
+    def formDescription[A]: BoundForm[A] @> Vector[String] =
+      BoundForm.formMetadata[A] >=> metadataDescription
   }
 
   /** The result of running a form
@@ -317,17 +327,17 @@ object FormValidation extends FormValidationInstances {
     *
     * @tparam A The type of the form's value
     */
-  case class Form[A](runForm: Env => ReaderWriterState[Unit, Vector[String], FormState, BoundForm[A]]) {
+  case class Form[A](runForm: Env => State[FormState, BoundForm[A]]) {
     import Form._
 
     /** Runs this form using the provided environment and initial state (defaulting to
       * an empty state).
       */
-    def run(env: Env, initialState: FormState = FormState(true)): (Vector[String], BoundForm[A], FormState) =
-      runForm(env).run((), initialState)
+    def run(env: Env, initialState: FormState = FormState(true)): (FormState, BoundForm[A]) =
+      runForm(env).run(initialState)
 
     /** Runs this form with an empty environment and state */
-    def runEmpty: (Vector[String], BoundForm[A], FormState) = run(Env.emptyEnv)
+    def runEmpty: (FormState, BoundForm[A]) = run(Env.emptyEnv)
 
     /** Runs this form with an empty environment and returns the result,
       * discarding any state.
@@ -335,16 +345,6 @@ object FormValidation extends FormValidationInstances {
     def evalEmpty: BoundForm[A] = runEmpty._2
 
     def eval(env: Env): BoundForm[A] = run(env)._2
-
-    def describe(f: A => Vector[String]): Form[A] = {
-      Form(env =>
-        for {
-          aa <- this.runForm(env)
-          descr = aa.result.fold(_ => Vector(), f)
-          _ <- RWSM.tell(descr)
-        } yield aa
-      )
-    }
 
     /** Returns a form that runs this form and saves the result to the current
       * `FormState`. Running the resulting form again will return the same result
@@ -354,10 +354,10 @@ object FormValidation extends FormValidationInstances {
       val __var = FormState.newFormStateVar[BoundForm[A]]()
       Form(env =>
         for {
-          v <- __var.st.rwst[Vector[String], Unit]
-          w <- v.map(RWSM.state[BoundForm[A]]).getOrElse(for {
+          v <- __var.st
+          w <- v.map(state[FormState, BoundForm[A]]).getOrElse(for {
               aa <- this.runForm(env)
-              _ <- (__var := aa.some).rwst[Vector[String], Unit]
+              _ <- __var := aa.some
             } yield aa)
         } yield w)
     }
@@ -368,9 +368,9 @@ object FormValidation extends FormValidationInstances {
     def context(c: String): Form[A] = {
       Form(env =>
         for {
-          _ <- RWSM.modify(_.pushContext(c))
+          _ <- modify[FormState](_.pushContext(c))
           aa <- this.runForm(env)
-          _ <- RWSM.modify(_.popContext)
+          _ <- modify[FormState](_.popContext)
         } yield aa)
     }
 
@@ -396,7 +396,7 @@ object FormValidation extends FormValidationInstances {
     def mapV[B](f: FormValidation[A, B]): Form[B] =
       Form(env =>
         for {
-          s <- RWSM.get
+          s <- get[FormState]
           aa <- this.runForm(env)
         } yield {
           val bb = foldV(aa.result map f.validation)
@@ -469,6 +469,9 @@ object FormValidation extends FormValidationInstances {
   def clearErrorContext: Form[A] =
     mapResult(FormMetadata.formErrorContext.set(_, None))
 
+  def describe(f: A => Vector[String]): Form[A] =
+    mapResult(a => a.result.fold(_ => a, s => FormMetadata.formDescription.set(a, f(s))))
+
   private def foldV[B](a: ValidationNelE[ValidationNelE[B]]): ValidationNelE[B] =
     a.fold(_.failure[B], identity)
 
@@ -476,7 +479,7 @@ object FormValidation extends FormValidationInstances {
   def val2[B](b: Form[B])(fs: FormValidation[(FormValue[B], A), A]*): Form[A] =
     Form(env =>
       for {
-        s <- RWSM.get
+        s <- get[FormState]
         bb <- b.runForm(env)
         aa <- this.runForm(env)
       } yield {
@@ -499,7 +502,7 @@ object FormValidation extends FormValidationInstances {
   ): Form[A] =
     Form(env =>
       for {
-        s <- RWSM.get
+        s <- get[FormState]
         bb <- b.runForm(env)
         cc <- c.runForm(env)
         aa <- this.runForm(env)
@@ -526,7 +529,7 @@ object FormValidation extends FormValidationInstances {
   ): Form[A] =
     Form(env =>
       for {
-        s <- RWSM.get
+        s <- get[FormState]
         bb <- b.runForm(env)
         cc <- c.runForm(env)
         dd <- d.runForm(env)
@@ -575,8 +578,6 @@ trait FormInstances {
 object Form extends FormInstances {
   val F = Applicative[Form]
 
-  val RWSM = IndexedReaderWriterStateT.rwstMonad[Id, Unit, Vector[String], FormState]
-
   /** Returns a form that always fails with the provided message */
   def failing[A](message: String): Form[A] = {
     F.point(message.failure.toValidationNel).liftStringV
@@ -584,11 +585,11 @@ object Form extends FormInstances {
 
   /** Returns a form that applies the provided selector and label */
   def sel(sel: CssSel, label: Option[String] = None): Form[Unit] =
-    fresult { (_, _) => BoundForm(().success, FormMetadata(label, None, None), sel) }
+    fresult { (_, _) => BoundForm(().success, FormMetadata(label, None, None, Vector()), sel) }
 
   /** A convenience method for defining a form using a function */
   def fresult[A](f: (Env, FormState) => BoundForm[A]): Form[A] =
-    Form(env => for (s <- RWSM.get) yield f(env, s))
+    Form(env => for (s <- get[FormState]) yield f(env, s))
 
   /** Returns a copy of the provided validation with the label set to a new value */
   def setLabel[A](in: ValidationNelE[A], label: Option[String]): ValidationNelE[A] =
@@ -597,7 +598,7 @@ object Form extends FormInstances {
   /** Lifts a form's result into a form that always returns that result when run */
   def liftResult[A](form: BoundForm[A]): Form[A] =
     Form(env =>
-      for (_ <- Form.RWSM.get)
+      for (_ <- get[FormState])
       yield form)
 
 }

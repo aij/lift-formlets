@@ -182,9 +182,9 @@ class HtmlFormsSpec extends FormletSpec {
 
       val sel = choice("test", None, options)(transform _).required
 
-      val (_, r, s) = sel.runEmpty
+      val (s, r) = sel.runEmpty
       val nonces = r.binder.apply(<div></div>).toString.split(",")
-      val (_, r2, _) = sel.run(Env.singleEnv(Map("test" -> nonces(1))), s)
+      val (_, r2) = sel.run(Env.singleEnv(Map("test" -> nonces(1))), s)
 
       r2.result must_== 2.success
     }
