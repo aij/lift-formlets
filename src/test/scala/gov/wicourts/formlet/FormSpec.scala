@@ -10,9 +10,9 @@ import Scalaz._
 import net.liftweb.util.Helpers.{^ => _, _}
 
 class FormSpec extends FormletSpec {
-  import FormHelpers._
-
   val F = Form.F
+
+  import FormValidation._
 
   def testEnv = new Env {
     def param(s: String) =
@@ -107,7 +107,7 @@ class FormSpec extends FormletSpec {
 
   "Memoization" >> {
     def randomResultForm: Form[String] =
-      liftResult(BoundForm(randomString(10).success, FormMetadata.empty, cssSelZero))
+      Form.liftResult(BoundForm(randomString(10).success, FormMetadata.empty, cssSelZero))
 
     "should not work without calling .memoize" >> {
       val form = F.tuple2(randomResultForm, randomResultForm)

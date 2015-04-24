@@ -1,8 +1,5 @@
-ul {
-  list-style-type: none;
-}
-
 #lift__noticesContainer__ ul {
+  list-style-type: none;
   font-size: inherit;
   margin-left: 0;
   margin-bottom: 0;

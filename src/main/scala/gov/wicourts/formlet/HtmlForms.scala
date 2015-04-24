@@ -14,7 +14,7 @@ import gov.wicourts.formlet.Form._
 
 /** Provides combinators for working with HTML forms */
 trait HtmlForms {
-  import FormHelpers._
+  import FormValidation._
 
   trait Converter[A] {
     def serialize(a: A): String

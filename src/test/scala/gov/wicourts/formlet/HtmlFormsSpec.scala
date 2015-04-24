@@ -12,7 +12,7 @@ import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.SHtml.SelectableOption
 
 class HtmlFormsSpec extends FormletSpec {
-  import FormHelpers._
+  import FormValidation._
 
   import HtmlForms._
   import HtmlForms.DefaultFieldHelpers._

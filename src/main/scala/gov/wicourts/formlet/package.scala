@@ -26,5 +26,5 @@ package object formlet {
 
   /** Lifts a function returning a String Validation to a [[FormValidation]]. */
   def StringValidation[A](f: A => Validation[String,A]): FormValidation[A,A] =
-    FormValidation(a => FormHelpers.liftStringV(f(a)), None)
+    FormValidation(a => FormValidation.liftStringV(f(a)), None)
 }
