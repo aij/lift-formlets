@@ -20,7 +20,7 @@ object Form1 {
   private def form: Form[Option[String]] =
     field(".fullName", input("fullName", none[String]))
 
-  private val binder = RequestBoundForm.newBinder(form) { a =>
+  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
     S.notice(s"Hi there, ${a getOrElse "N/A"}. Nice to meet you!")
   }
 
@@ -76,7 +76,7 @@ object Form2 {
       inputField("lastName", "Last name", none[String]).required
     )(FullName.apply _)
 
-  private val binder = RequestBoundForm.newBinder(form) { a =>
+  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
     S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
   }
 
@@ -95,7 +95,7 @@ object Form2 {
   def inputField[A](
     name: String, labelText: String, default: Option[A]
   )(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+    implicit converter: Converter[Option[A]]
   ): Form[Option[A]] = {
     val attrs = "label [for]" #> name & "input [id]" #> name
     val labeledField = label(labelText) *> input(name, default) <* sel(attrs)
@@ -155,7 +155,7 @@ object Form3 {
       field(".mailingList", checkbox("mailingList", true))
     )(Registration.apply _)
 
-  private val binder = RequestBoundForm.newBinder(form) { a =>
+  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
     // Just for demo purposes!
     S.notice(
       <div>
@@ -181,7 +181,7 @@ object Form3 {
   def inputField[A](
     name: String, labelText: String, default: Option[A]
   )(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+    implicit converter: Converter[Option[A]]
   ): Form[Option[A]] = {
     val labeledField = input(name, default) <* sel("input [id]" #> name)
 
@@ -195,7 +195,7 @@ object Form3 {
     options: List[SelectableOption[A]],
     asRadioButtons: Boolean = false
   )(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+    implicit converter: Converter[Option[A]]
   ): Form[Option[A]] = {
     field(s".$name", select(name, default, options, asRadioButtons))
   }
@@ -206,7 +206,7 @@ object Form3 {
     options: List[SelectableOption[A]],
     asCheckboxes: Boolean = false
   )(
-    implicit serializer: Serializer[Option[A]], converter: Converter[Option[A]]
+    implicit converter: Converter[Option[A]]
   ): Form[List[A]] = {
     field(s".$name", multiSelect(name, default, options, asCheckboxes))
   }
