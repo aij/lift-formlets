@@ -336,11 +336,11 @@ object FormValidation extends FormValidationInstances {
 
     def eval(env: Env): BoundForm[A] = run(env)._2
 
-    def describe(f: A => String): Form[A] = {
+    def describe(f: A => Vector[String]): Form[A] = {
       Form(env =>
         for {
           aa <- this.runForm(env)
-          descr = aa.result.fold(_ => Vector(), a => Vector(f(a)))
+          descr = aa.result.fold(_ => Vector(), f)
           _ <- RWSM.tell(descr)
         } yield aa
       )

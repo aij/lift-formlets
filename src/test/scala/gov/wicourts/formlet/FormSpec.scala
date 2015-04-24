@@ -30,8 +30,8 @@ class FormSpec extends FormletSpec {
 
   "A form" >> {
     "can be described" >> {
-      val a = F.point[String]("ok").describe(a => "a: " + a)
-      val b = F.point[String]("really ok").describe(b => "b: " + b)
+      val a = F.point[String]("ok").describe(a => Vector("a: " + a))
+      val b = F.point[String]("really ok").describe(b => Vector("b: " + b))
       val c = Form.failing[String]("nope!")
 
       val d = F.tuple3(a, b, c)
