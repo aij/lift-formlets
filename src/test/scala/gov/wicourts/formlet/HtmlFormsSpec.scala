@@ -5,8 +5,13 @@ import org.specs2.matcher.XmlMatchers
 
 import xml._
 
-import scalaz._
-import Scalaz._
+import scalaz.Validation._
+
+import scalaz.std.option._
+
+import scalaz.syntax.applicative._
+import scalaz.syntax.std.option._
+import scalaz.syntax.validation._
 
 import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.SHtml.SelectableOption

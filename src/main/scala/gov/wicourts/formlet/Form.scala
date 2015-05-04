@@ -7,7 +7,19 @@ import net.liftweb.util.Helpers.{^ => _, _}
 import xml._
 
 import scalaz._
-import Scalaz._
+
+import scalaz.State._
+import scalaz.Validation._
+
+import scalaz.std.list._
+import scalaz.std.option._
+
+import scalaz.syntax.applicative._
+import scalaz.syntax.nel._
+import scalaz.syntax.state._
+import scalaz.syntax.std.option._
+import scalaz.syntax.traverse._
+import scalaz.syntax.validation._
 
 import AlignFunctions._
 

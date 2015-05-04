@@ -1,7 +1,6 @@
 package gov.wicourts
 
-import scalaz._
-import Scalaz._
+import scalaz.{ValidationNel, Validation}
 
 import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.util.{A => _, _}

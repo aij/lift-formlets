@@ -8,7 +8,12 @@ import net.liftweb.util.Helpers.{^ => _, _}
 import xml._
 
 import scalaz._
-import Scalaz._
+
+import scalaz.State._
+
+import scalaz.syntax.std.option._
+import scalaz.syntax.std.string._
+import scalaz.syntax.validation._
 
 import gov.wicourts.formlet.Form._
 

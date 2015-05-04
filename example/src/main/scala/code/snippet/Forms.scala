@@ -7,8 +7,11 @@ import gov.wicourts.formlet.HtmlForms.DefaultFieldHelpers._
 import gov.wicourts.formlet.HtmlForms.FoundationErrorBinder._
 import gov.wicourts.formlet.snippet.RequestBoundForm
 
-import scalaz._
-import Scalaz._
+import scalaz.std.option._
+
+import scalaz.syntax.std.option._
+import scalaz.syntax.applicative._
+import scalaz.syntax.validation._
 
 import net.liftweb.util.Helpers.{^ => _, _}
 import net.liftweb.http.S

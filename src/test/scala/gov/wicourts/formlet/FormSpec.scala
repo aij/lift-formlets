@@ -4,10 +4,12 @@ import org.specs2.mutable.Specification
 
 import xml._
 
-import scalaz._
-import Scalaz._
-
 import net.liftweb.util.Helpers.{^ => _, _}
+
+import scalaz.std.option._
+
+import scalaz.syntax.std.option._
+import scalaz.syntax.validation._
 
 class FormSpec extends FormletSpec {
   val F = Form.F
