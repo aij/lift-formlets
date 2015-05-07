@@ -17,65 +17,55 @@ object RequestBoundForm {
     def render(form: BoundForm[A], contents: NodeSeq): NodeSeq
   }
 
-  /** Creates a new function for binding a form to a template. N.B. The
-    * result be assigned to a `val` that persists across requests (for example,
-    * a val in a snippet singleton object).
-    *
-    * @param form The form to bind. It will be recreated when processing a request.
-    * @param process The function to call when the form is successfully validated.
-    */
-  def newBinder[A](form: => Form[A])(process: (Vector[String], A) => Unit): NodeSeq => NodeSeq = {
-    val p = process
-    create[A](newFormState, form)(new RequestProcessor[A] {
-      def process(descr: Vector[String], result: ValidationNelE[A]) = result.foreach(p(descr, _))
+  def newBinder[A](f: (Vector[String], A) => Unit): Form[A] => NodeSeq => NodeSeq =
+    newFormHandler[A](new MutableFormState[A](), new RequestProcessor[A] {
+      def process(descr: Vector[String], result: ValidationNelE[A]): Unit =
+        result.foreach(f(descr, _))
       def render(form: BoundForm[A], contents: NodeSeq): NodeSeq =
-        form.binder(contents)
+        form.binder.apply(contents)
     })
-  }
 
-  def newBinderR[A](form: => Form[A])(processor: RequestProcessor[A]): NodeSeq => NodeSeq =
-    create[A](newFormState, form)(processor)
-
-  /** Creates a new `RequestVar[FormState]`, configured for initial display */
-  private def newFormState: RequestVar[FormState] = {
-    new RequestVar[FormState](FormState(false)) {
-      override lazy val __nameSalt = Helpers.nextFuncName
-    }
-  }
-
-  private def create[A](
-    formState: RequestVar[FormState], form: => Form[A]
-  )(
+  def newFormHandler[A](
+    state: MutableFormState[A],
     processor: RequestProcessor[A]
-  ): NodeSeq => NodeSeq = {
-    // This is kind of awkward. On submission, we want to run the form right
-    // away. On the other hand, we don't want to run it again when it's time
-    // to display it.
-    object currentResult extends TransientRequestVar[Option[BoundForm[A]]](None) {
-      override lazy val __nameSalt = Helpers.nextFuncName
+  ): Form[A] => NodeSeq => NodeSeq = {
+    form => ns => {
+      val (s, a) = state.currentResult.get
+        .map(a => (state.formState.get, a))
+        .getOrElse(form.run(Env.emptyEnv, state.formState.get))
+
+      val processSubmission: Elem = SHtml.hidden(() => {
+        state.formState.set(s.copy(renderErrors_? = true))
+
+        val (s2, a2) = form.run(Env.paramsEnv, state.formState.get)
+
+        processor.process(a2.metadata.description, a2.result)
+
+        state.currentResult.set(Some(a2))
+        state.formState.set(s2)
+      })
+
+      ns match {
+        case e: Elem => e.copy(child = processSubmission ++ processor.render(a, e.child))
+        case n => n
+      }
     }
+  }
+}
 
-    {
-      ns: NodeSeq =>
-        val (s, a) = currentResult.get
-          .map(a => (formState.get, a))
-          .getOrElse(form.run(Env.emptyEnv, formState.get))
+/** An opaque class whose instances contain the Lift-specific state necessary
+  * to run a form. The same instance should generally be used across all
+  * requests for a particular form.
+  */
+class MutableFormState[A] {
+  // This is kind of awkward. On submission, we want to run the form right
+  // away. On the other hand, we don't want to run it again when it's time to
+  // display it.
+  private [snippet] object currentResult extends TransientRequestVar[Option[BoundForm[A]]](None) {
+    override lazy val __nameSalt = Helpers.nextFuncName
+  }
 
-        val processSubmission: Elem = SHtml.hidden(() => {
-          formState.set(s.copy(renderErrors_? = true))
-
-          val (s2, a2) = form.run(Env.paramsEnv, formState.get)
-
-          processor.process(a2.metadata.description, a2.result)
-
-          currentResult.set(Some(a2))
-          formState.set(s2)
-        })
-
-        ns match {
-          case e: Elem => e.copy(child = processSubmission ++ processor.render(a, e.child))
-          case n => n
-        }
-    }
+  private [snippet] object formState extends RequestVar[FormState](FormState(false)) {
+    override lazy val __nameSalt = Helpers.nextFuncName
   }
 }

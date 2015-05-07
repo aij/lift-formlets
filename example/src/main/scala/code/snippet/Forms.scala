@@ -23,11 +23,11 @@ object Form1 {
   private def form: Form[Option[String]] =
     field(".fullName", input("fullName", none[String]))
 
-  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
+  private val binder = RequestBoundForm.newBinder[Option[String]] { (_, a) =>
     S.notice(s"Hi there, ${a getOrElse "N/A"}. Nice to meet you!")
   }
 
-  def render = ".form1" #> binder
+  def render = ".form1" #> binder(form)
 }
 
 // Template: src/main/webapp/form2.html
@@ -79,11 +79,11 @@ object Form2 {
       inputField("lastName", "Last name", none[String]).required
     )(FullName.apply _)
 
-  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
+  private val binder = RequestBoundForm.newBinder[FullName] { (_, a) =>
     S.notice(s"Hi there, ${a.fullName}. Nice to meet you!")
   }
 
-  def render = ".form2" #> binder
+  def render = ".form2" #> binder(form)
 
   // An example combinator that composes several forms (four to be exact).
   // labelText is bound to a <label>. An <input> is bound with the provided
@@ -158,7 +158,7 @@ object Form3 {
       field(".mailingList", checkbox("mailingList", true))
     )(Registration.apply _)
 
-  private val binder = RequestBoundForm.newBinder(form) { (_, a) =>
+  private val binder = RequestBoundForm.newBinder[Registration] { (_, a) =>
     // Just for demo purposes!
     S.notice(
       <div>
@@ -174,7 +174,7 @@ object Form3 {
     )
   }
 
-  def render = ".form3" #> binder
+  def render = ".form3" #> binder(form)
 
   // A few combinators for input forms identified by CSS class name.
 
