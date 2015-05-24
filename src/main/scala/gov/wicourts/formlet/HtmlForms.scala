@@ -291,7 +291,7 @@ trait HtmlForms {
             val checkboxNs = <input type="checkbox" name={formName} value="true" />
 
             element.attributes.foldLeft(checkboxNs)(_ % _) % checked(formValue | default) ++
-            <input type="hidden" name={formName} value="false" />
+              <input type="hidden" name={formName} value="false" />
           }
         }})
       }
