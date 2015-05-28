@@ -68,4 +68,14 @@ class MutableFormState[A] {
   private [snippet] object formState extends RequestVar[FormState](FormState(false)) {
     override lazy val __nameSalt = Helpers.nextFuncName
   }
+
+  def capture: () => Unit = {
+    val r = currentResult.get
+    val s = formState.get
+
+    () => {
+      currentResult.set(r)
+      formState.set(s)
+    }
+  }
 }
