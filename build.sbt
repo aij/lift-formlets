@@ -2,9 +2,9 @@ name := "lift-formlets"
 
 organization := "gov.wicourts"
 
-version := "0.1.0-SNAPSHOT"
+version := "0.1.0"
 
-scalaVersion := "2.11.4"
+scalaVersion := "2.11.6"
 
 resolvers += "Sonatype Snapshots Repository" at "http://oss.sonatype.org/content/repositories/snapshots"
 
@@ -28,12 +28,5 @@ scalacOptions ++= Seq("-deprecation","-feature","-Xfatal-warnings")
 
 //scalacOptions in Test ++= Seq("-Yrangepos")
 
-publishTo <<= version { (v: String) =>
-  val nexus = "https://oss.sonatype.org/"
-  if (v.trim.endsWith("SNAPSHOT"))
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
+licenses += ("MIT", url("http://opensource.org/licenses/MIT"))
 
-credentials += Credentials(Path.userHome / ".sonatype")

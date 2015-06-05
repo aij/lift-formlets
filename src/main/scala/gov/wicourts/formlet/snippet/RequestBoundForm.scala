@@ -14,14 +14,14 @@ object RequestBoundForm {
     def process(descr: Vector[String], result: ValidationNelE[A]): Unit
 
     /** Renders a form */
-    def render(form: BoundForm[A], contents: NodeSeq): NodeSeq
+    def render(state: MutableFormState[A], form: BoundForm[A], contents: NodeSeq): NodeSeq
   }
 
   def newBinder[A](f: (Vector[String], A) => Unit): Form[A] => NodeSeq => NodeSeq =
     newFormHandler[A](new MutableFormState[A](), new RequestProcessor[A] {
       def process(descr: Vector[String], result: ValidationNelE[A]): Unit =
         result.foreach(f(descr, _))
-      def render(form: BoundForm[A], contents: NodeSeq): NodeSeq =
+      def render(state: MutableFormState[A], form: BoundForm[A], contents: NodeSeq): NodeSeq =
         form.binder.apply(contents)
     })
 
@@ -46,14 +46,14 @@ object RequestBoundForm {
       })
 
       ns match {
-        case e: Elem => e.copy(child = processSubmission ++ processor.render(a, e.child))
+        case e: Elem => e.copy(child = processSubmission ++ processor.render(state, a, e.child))
         case n => n
       }
     }
   }
 }
 
-/** An opaque class whose instances contain the Lift-specific state necessary
+/** An class whose instances contain the Lift-specific state necessary
   * to run a form. The same instance should generally be used across all
   * requests for a particular form.
   */
@@ -61,11 +61,11 @@ class MutableFormState[A] {
   // This is kind of awkward. On submission, we want to run the form right
   // away. On the other hand, we don't want to run it again when it's time to
   // display it.
-  private [snippet] object currentResult extends TransientRequestVar[Option[BoundForm[A]]](None) {
+  object currentResult extends TransientRequestVar[Option[BoundForm[A]]](None) {
     override lazy val __nameSalt = Helpers.nextFuncName
   }
 
-  private [snippet] object formState extends RequestVar[FormState](FormState(false)) {
+  object formState extends RequestVar[FormState](FormState(false)) {
     override lazy val __nameSalt = Helpers.nextFuncName
   }
 
