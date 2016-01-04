@@ -37,6 +37,8 @@ class HtmlFormsSpec extends FormletSpec {
     def file(s: String) = None
   }
 
+  def testClearedEnv = Env.singleEnv(Map("test" -> ""))
+
   "A label form" >> {
     "should bind the label to the argument" >> {
       val in = <label></label>
@@ -60,6 +62,11 @@ class HtmlFormsSpec extends FormletSpec {
       val in = <input />
       val out = <input name="test" value="a" />
       check(input("test", "a".some), in, out)
+    }
+
+    "should be possible to clear" >> {
+      val r = input("test", "test default".some).eval(testClearedEnv)
+      r.result must_== Some("").success
     }
 
     "should support client-side validation" >> {
