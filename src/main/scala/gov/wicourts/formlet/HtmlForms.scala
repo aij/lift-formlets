@@ -359,7 +359,11 @@ trait HtmlForms {
     implicit def optionConverter[A](implicit c: Converter[A]): Converter[Option[A]] =
       new Converter[Option[A]] {
         override def serialize(a: Option[A]) = a.map(c.serialize).getOrElse("")
-        override def convert(s: String) = c.convert(s).map(Some(_))
+        override def convert(s: String) =
+          if (s.nonEmpty)
+            c.convert(s).map(Some(_))
+          else
+            None.success
       }
   }
 

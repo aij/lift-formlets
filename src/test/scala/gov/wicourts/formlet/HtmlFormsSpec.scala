@@ -66,7 +66,7 @@ class HtmlFormsSpec extends FormletSpec {
 
     "should be possible to clear" >> {
       val r = input("test", "test default".some).eval(testClearedEnv)
-      r.result must_== Some("").success
+      r.result must_== None.success
     }
 
     "should support client-side validation" >> {
